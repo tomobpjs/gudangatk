@@ -1,600 +1,595 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  LayoutDashboard, 
-  Settings, 
-  Package, 
-  ArrowDownLeft, 
-  ArrowUpRight, 
-  Database, 
-  History, 
-  MapPin, 
-  BarChart3, 
-  TrendingUp, 
-  Printer, 
-  Download, 
-  Plus, 
-  Upload, 
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  Menu,
-  X,
-  Trash2,
-  Edit2,
-  AlertCircle,
-  CheckCircle2,
-  MoreVertical
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Inventory RSU Dadi Keluarga</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f8fafc;
+        }
+        
+        .tab-active {
+            background-color: white;
+            color: #4f46e5;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
 
-// --- MOCK DATA ---
-const INITIAL_CATEGORIES = ["Alat Tulis Kantor", "Plastik", "BHP", "Alat Kebersihan", "Elektronik"];
-const INITIAL_ITEMS = [
-  { id: 1, name: "Kertas A4", category: "Alat Tulis Kantor", stock: 50, unit: "Rim", lastPrice: 55000, room: "Gudang A" },
-  { id: 2, name: "Sapu ijuk", category: "Alat Kebersihan", stock: 8, unit: "Pcs", lastPrice: 25000, room: "Gudang B" },
-  { id: 3, name: "Plastik Bubble Wrap", category: "Plastik", stock: 5, unit: "Roll", lastPrice: 150000, room: "Gudang A" },
-  { id: 4, name: "Toner Printer HP", category: "BHP", stock: 15, unit: "Pcs", lastPrice: 850000, room: "Gudang A" },
-];
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 0; 
+            }
+            .no-print { display: none !important; }
+            .print-only { 
+                display: flex !important; 
+                flex-direction: column;
+                align-items: center; 
+                justify-content: flex-start;
+                width: 100%;
+                min-height: 100vh;
+                background: white;
+                padding-top: 0.5in; 
+            }
+            body { 
+                background: white; 
+                margin: 0;
+                padding: 0;
+            }
+            #printArea {
+                width: 4.5in;
+                height: 7.7in;
+                padding: 0.2in;
+                box-sizing: border-box;
+                border: 0.5px solid #eee;
+                margin: 0 auto; 
+            }
+        }
 
-const INITIAL_TRANSACTIONS = [
-  { id: 'T001', date: '2023-10-20', itemId: 1, type: 'MASUK', qty: 10, price: 54000, room: 'Gudang A' },
-  { id: 'T002', date: '2023-10-21', itemId: 2, type: 'KELUAR', qty: 2, price: 25000, room: 'Gudang B' },
-  { id: 'T003', date: '2023-10-22', itemId: 3, type: 'MASUK', qty: 5, price: 145000, room: 'Gudang A' },
-];
+        .print-only { display: none; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
-// --- MAIN APP COMPONENT ---
-const App = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  
-  // App States
-  const [categories, setCategories] = useState(INITIAL_CATEGORIES);
-  const [items, setItems] = useState(INITIAL_ITEMS);
-  const [transactions, setTransactions] = useState(INITIAL_TRANSACTIONS);
+        /* Loading Overlay */
+        #loadingOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
 
-  // Global Statistics
-  const stats = useMemo(() => {
-    return {
-      totalItems: items.length,
-      totalStock: items.reduce((acc, curr) => acc + curr.stock, 0),
-      lowStock: items.filter(i => i.stock < 10).length,
-      transactionsMonth: transactions.length,
-      inventoryValue: items.reduce((acc, curr) => acc + (curr.stock * curr.lastPrice), 0)
-    };
-  }, [items, transactions]);
-
-  // --- SUB-PAGES ---
-
-  const Dashboard = () => (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-end">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Ringkasan Gudang</h2>
-          <p className="text-gray-500">Pantau performa dan stok inventaris secara real-time.</p>
+    <div id="loadingOverlay">
+        <div class="flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-700"></div>
+            <p class="mt-4 text-sm font-bold text-indigo-700">Menghubungkan ke Cloud...</p>
         </div>
-        <div className="text-right hidden md:block">
-          <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Total Nilai Aset</p>
-          <p className="text-2xl font-bold text-blue-600">Rp {stats.inventoryValue.toLocaleString()}</p>
-        </div>
-      </div>
+    </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Barang', val: stats.totalItems, icon: Package, color: 'bg-blue-500', trend: '+2' },
-          { label: 'Total Unit Stok', val: stats.totalStock, icon: Database, color: 'bg-indigo-500', trend: '+45' },
-          { label: 'Stok Kritis', val: stats.lowStock, icon: AlertCircle, color: 'bg-rose-500', trend: '-1' },
-          { label: 'Transaksi', val: stats.transactionsMonth, icon: History, color: 'bg-emerald-500', trend: '+12' },
-        ].map((s, i) => (
-          <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 group hover:border-blue-200 transition-all">
-            <div className="flex justify-between items-start mb-4">
-              <div className={`${s.color} p-3 rounded-xl text-white shadow-lg shadow-opacity-20`}>
-                <s.icon size={22} />
-              </div>
-              <span className={`text-xs font-bold px-2 py-1 rounded-full ${s.trend.startsWith('+') ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                {s.trend}
-              </span>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-400 mb-1">{s.label}</p>
-              <p className="text-2xl font-bold text-gray-800">{s.val}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-gray-800 flex items-center">
-              <History size={18} className="mr-2 text-blue-500" />
-              Aktivitas Logistik Terakhir
-            </h3>
-            <button onClick={() => setActiveTab('database_transaksi')} className="text-xs text-blue-600 hover:underline font-semibold">Lihat Semua</button>
-          </div>
-          <div className="space-y-4">
-            {transactions.slice(0, 5).reverse().map((t, idx) => {
-              const item = items.find(i => i.id === t.itemId);
-              return (
-                <div key={idx} className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition border border-transparent hover:border-gray-100">
-                  <div className="flex items-center space-x-4">
-                    <div className={`p-2 rounded-full ${t.type === 'MASUK' ? 'bg-green-100 text-green-600' : 'bg-rose-100 text-rose-600'}`}>
-                      {t.type === 'MASUK' ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
+    <!-- Header Aplikasi -->
+    <header class="bg-indigo-700 text-white shadow-lg no-print">
+        <div class="container mx-auto px-6 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="bg-white p-2 rounded-xl">
+                        <svg class="w-8 h-8 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
                     </div>
                     <div>
-                      <p className="font-bold text-gray-800">{item?.name || 'Item Dihapus'}</p>
-                      <p className="text-xs text-gray-500">{t.date} • {t.room}</p>
+                        <h1 class="text-xl font-extrabold tracking-tight italic">RSU DADI KELUARGA</h1>
+                        <p id="userStatus" class="text-indigo-100 text-[10px] font-bold uppercase tracking-[0.2em]">Memuat User...</p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`font-bold ${t.type === 'MASUK' ? 'text-green-600' : 'text-rose-600'}`}>
-                      {t.type === 'MASUK' ? '+' : '-'}{t.qty} {item?.unit}
-                    </p>
-                    <p className="text-xs text-gray-400">Total: Rp {(t.qty * t.price).toLocaleString()}</p>
-                  </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-gray-800 flex items-center">
-              <AlertCircle size={18} className="mr-2 text-rose-500" />
-              Stok Kritis
-            </h3>
-          </div>
-          <div className="space-y-4">
-            {items.sort((a,b) => a.stock - b.stock).slice(0, 5).map((item, idx) => (
-              <div key={idx} className="group relative">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="font-medium text-gray-700">{item.name}</span>
-                  <span className={`font-bold ${item.stock < 10 ? 'text-rose-600' : 'text-amber-600'}`}>
-                    {item.stock} / 10
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full transition-all duration-500 ${item.stock < 5 ? 'bg-rose-500' : 'bg-amber-400'}`}
-                    style={{ width: `${Math.min((item.stock/10)*100, 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-            ))}
-            <div className="pt-4 mt-4 border-t border-gray-100">
-              <button className="w-full py-2 bg-gray-50 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-100 transition">
-                Generate Daftar Belanja
-              </button>
+                
+                <nav class="flex bg-indigo-800/50 p-1 rounded-2xl overflow-x-auto">
+                    <button onclick="switchTab('input')" id="btn-input" class="nav-btn px-6 py-2 rounded-xl text-sm font-bold transition-all tab-active whitespace-nowrap">Input</button>
+                    <button onclick="switchTab('database')" id="btn-database" class="nav-btn px-6 py-2 rounded-xl text-sm font-bold transition-all text-indigo-200 hover:text-white whitespace-nowrap">Riwayat</button>
+                    <button onclick="switchTab('report')" id="btn-report" class="nav-btn px-6 py-2 rounded-xl text-sm font-bold transition-all text-indigo-200 hover:text-white whitespace-nowrap">Laporan</button>
+                    <button onclick="switchTab('master')" id="btn-master" class="nav-btn px-6 py-2 rounded-xl text-sm font-bold transition-all text-indigo-200 hover:text-white whitespace-nowrap">Master Barang</button>
+                </nav>
             </div>
-          </div>
         </div>
-      </div>
-    </div>
-  );
+    </header>
 
-  const MasterSettings = () => {
-    const [newCat, setNewCat] = useState('');
-    
-    return (
-      <div className="p-6 max-w-4xl mx-auto space-y-8">
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="font-bold text-xl flex items-center mb-6 text-gray-800">
-            <Settings className="mr-3 text-blue-500" size={24} /> 
-            Manajemen Kategori
-          </h3>
-          <div className="flex flex-col md:flex-row gap-4 mb-8">
-            <input 
-              type="text" 
-              placeholder="Ketik kategori baru..." 
-              className="flex-1 border-2 border-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-              value={newCat}
-              onChange={(e) => setNewCat(e.target.value)}
-            />
-            <button 
-              onClick={() => {
-                if(newCat && !categories.includes(newCat)) setCategories([...categories, newCat]);
-                setNewCat('');
-              }}
-              className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition"
-            >
-              Tambah Kategori
-            </button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {categories.map((c, i) => (
-              <div key={i} className="group bg-gray-50 px-4 py-3 rounded-xl flex items-center justify-between border border-transparent hover:border-blue-200 hover:bg-blue-50 transition">
-                <span className="text-sm font-medium text-gray-700">{c}</span>
-                <button 
-                  className="text-gray-400 hover:text-rose-500 transition" 
-                  onClick={() => setCategories(categories.filter(cat => cat !== c))}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-2xl shadow-xl text-white">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="text-center md:text-left">
-              <h3 className="font-bold text-xl mb-2 flex items-center justify-center md:justify-start">
-                <Upload className="mr-3 text-blue-400" size={24} /> Import Data Massal
-              </h3>
-              <p className="text-gray-400 text-sm">Gunakan template Excel untuk menambahkan ratusan barang sekaligus.</p>
-            </div>
-            <button className="bg-white text-gray-900 px-8 py-3 rounded-xl font-bold hover:bg-blue-50 transition flex items-center whitespace-nowrap">
-              <Download size={18} className="mr-2" /> Download Template
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const InventoryTable = ({ type }) => {
-    const [search, setSearch] = useState('');
-    const filteredItems = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
-
-    return (
-      <div className="p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800 capitalize">{type.replace('_', ' ')}</h2>
-            <p className="text-sm text-gray-500">Kelola informasi detail barang dan lokasi penyimpanan.</p>
-          </div>
-          <div className="flex space-x-2 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-3 top-3 text-gray-400" size={18} />
-              <input 
-                type="text" 
-                placeholder="Cari barang..." 
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition shadow-sm"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <button className="bg-blue-600 text-white px-5 py-2.5 rounded-xl flex items-center font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-100">
-              <Plus size={20} className="mr-2" /> Barang Baru
-            </button>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden overflow-x-auto">
-          <table className="w-full min-w-[800px]">
-            <thead className="bg-gray-50/50 border-b border-gray-100">
-              <tr className="text-left text-xs font-bold text-gray-400 uppercase tracking-widest">
-                <th className="px-8 py-5">Info Barang</th>
-                <th className="px-6 py-5">Kategori</th>
-                <th className="px-6 py-5">Lokasi</th>
-                <th className="px-6 py-5">Stok Saat Ini</th>
-                <th className="px-6 py-5">Valuasi</th>
-                <th className="px-8 py-5 text-center">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredItems.map((item) => (
-                <tr key={item.id} className="hover:bg-blue-50/30 transition group">
-                  <td className="px-8 py-5">
-                    <p className="font-bold text-gray-800 group-hover:text-blue-600 transition">{item.name}</p>
-                    <p className="text-xs text-gray-400">ID: PRD-{item.id.toString().padStart(4, '0')}</p>
-                  </td>
-                  <td className="px-6 py-5">
-                    <span className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-tighter">
-                      {item.category}
-                    </span>
-                  </td>
-                  <td className="px-6 py-5 text-gray-600 flex items-center">
-                    <MapPin size={14} className="mr-2 text-gray-400" />
-                    {item.room}
-                  </td>
-                  <td className="px-6 py-5">
-                    <div className="flex items-center space-x-2">
-                       <span className={`font-bold text-lg ${item.stock < 10 ? 'text-rose-500' : 'text-gray-800'}`}>
-                         {item.stock}
-                       </span>
-                       <span className="text-xs font-medium text-gray-400">{item.unit}</span>
+    <main class="container mx-auto px-4 mt-8 no-print">
+        <!-- Tab Input -->
+        <div id="tab-input" class="tab-content max-w-3xl mx-auto space-y-6">
+            <div class="bg-white rounded-[2rem] shadow-2xl shadow-indigo-100 border border-slate-100 overflow-hidden">
+                <div class="p-8 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center">
+                    <div>
+                        <h2 id="formTitle" class="text-2xl font-black text-slate-800">Form Pengambilan</h2>
+                        <p class="text-slate-400 text-sm">Lengkapi data pengambilan barang di bawah ini.</p>
                     </div>
-                  </td>
-                  <td className="px-6 py-5">
-                    <p className="font-bold text-gray-700">Rp {(item.stock * item.lastPrice).toLocaleString()}</p>
-                    <p className="text-[10px] text-gray-400 uppercase">Avg: Rp {item.lastPrice.toLocaleString()}</p>
-                  </td>
-                  <td className="px-8 py-5">
-                    <div className="flex justify-center space-x-2">
-                      <button className="p-2 text-gray-400 hover:bg-white hover:text-blue-600 rounded-lg shadow-sm border border-transparent hover:border-gray-100 transition">
-                        <Edit2 size={16} />
-                      </button>
-                      <button className="p-2 text-gray-400 hover:bg-white hover:text-rose-600 rounded-lg shadow-sm border border-transparent hover:border-gray-100 transition">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
-
-  const StockReport = () => {
-    const handlePrint = () => { window.print(); }
-
-    return (
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-8 print:hidden">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">Laporan Persediaan</h2>
-            <p className="text-sm text-gray-500">Rekapitulasi nilai aset dan kuantitas barang.</p>
-          </div>
-          <div className="flex space-x-3">
-            <button onClick={handlePrint} className="bg-gray-900 text-white px-6 py-2.5 rounded-xl flex items-center font-bold hover:bg-black transition shadow-lg shadow-gray-200">
-              <Printer size={18} className="mr-2" /> Cetak Laporan
-            </button>
-            <button className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl flex items-center font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-100">
-              <Download size={18} className="mr-2" /> Export Excel
-            </button>
-          </div>
-        </div>
-        
-        <div className="bg-white p-12 rounded-2xl shadow-xl border border-gray-100 print:shadow-none print:border-0 print:p-0">
-          <div className="flex justify-between items-start mb-10 border-b border-gray-100 pb-8">
-            <div>
-              <div className="flex items-center space-x-2 text-blue-600 font-bold text-3xl mb-1">
-                <Package size={32} />
-                <span>GUDANGPRO</span>
-              </div>
-              <p className="text-gray-400 text-sm">Sistem Manajemen Logistik Terpadu</p>
-            </div>
-            <div className="text-right">
-              <h1 className="text-xl font-bold text-gray-800 uppercase tracking-[0.2em] mb-1">Laporan Stok Barang</h1>
-              <p className="text-gray-500 text-sm">Periode: {new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
-              <p className="text-xs text-gray-400 mt-1">Dicetak pada: {new Date().toLocaleString('id-ID')}</p>
-            </div>
-          </div>
-          
-          <table className="w-full border-collapse rounded-xl overflow-hidden">
-            <thead>
-              <tr className="bg-gray-900 text-white text-left text-xs uppercase tracking-widest">
-                <th className="p-4">No</th>
-                <th className="p-4">Detail Barang</th>
-                <th className="p-4">Kategori</th>
-                <th className="p-4">Lokasi</th>
-                <th className="p-4 text-right">Stok</th>
-                <th className="p-4 text-right">Valuasi (Rp)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 border">
-              {items.map((item, i) => (
-                <tr key={item.id} className="text-sm">
-                  <td className="p-4 text-center font-mono text-gray-400">{i + 1}</td>
-                  <td className="p-4 font-bold text-gray-800">{item.name}</td>
-                  <td className="p-4 text-gray-600">{item.category}</td>
-                  <td className="p-4 text-gray-600">{item.room}</td>
-                  <td className="p-4 text-right font-bold">{item.stock} {item.unit}</td>
-                  <td className="p-4 text-right font-mono text-gray-700">{(item.stock * item.lastPrice).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-blue-600 text-white font-bold text-lg">
-                <td colSpan={5} className="p-6 text-right uppercase tracking-widest text-xs">Total Nilai Persediaan</td>
-                <td className="p-6 text-right font-mono">Rp {stats.inventoryValue.toLocaleString()}</td>
-              </tr>
-            </tfoot>
-          </table>
-          <div className="mt-12 grid grid-cols-3 gap-8 text-center print:mt-24">
-            <div className="space-y-16">
-              <p className="text-xs font-bold text-gray-400 uppercase">Petugas Gudang</p>
-              <p className="font-bold border-t pt-2 border-gray-200 uppercase text-xs">Admin Gudang</p>
-            </div>
-            <div></div>
-            <div className="space-y-16">
-              <p className="text-xs font-bold text-gray-400 uppercase">Kepala Logistik</p>
-              <p className="font-bold border-t pt-2 border-gray-200 uppercase text-xs">M. Syafi'i</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const PriceTrend = () => (
-    <div className="p-6">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-800">Tren & Fluktuasi Harga</h2>
-        <p className="text-sm text-gray-500">Pantau perubahan harga beli terakhir untuk optimasi anggaran.</p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {items.map((item) => (
-          <div key={item.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h3 className="font-bold text-gray-800">{item.name}</h3>
-                <p className="text-xs text-gray-400 uppercase tracking-tighter">{item.category}</p>
-              </div>
-              <div className="bg-green-50 text-green-600 px-2 py-1 rounded-lg text-[10px] font-black flex items-center">
-                <TrendingUp size={12} className="mr-1" /> +2.4%
-              </div>
-            </div>
-            
-            <div className="h-32 flex items-end space-x-2 mb-6 bg-gray-50/50 p-2 rounded-xl">
-              {[40, 60, 45, 70, 85, 65, 90, 80].map((h, i) => (
-                <div 
-                  key={i} 
-                  className="bg-blue-500/80 flex-1 rounded-t-md hover:bg-blue-600 transition-colors" 
-                  style={{ height: `${h}%` }}
-                ></div>
-              ))}
-            </div>
-            
-            <div className="flex justify-between items-center text-sm border-t border-gray-50 pt-4">
-              <span className="text-gray-400 font-medium italic">Latest Price</span>
-              <span className="font-bold text-gray-800">Rp {item.lastPrice.toLocaleString()}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  // Helper for Sidebar Items
-  const NavItem = ({ id, label, icon: Icon }) => (
-    <button 
-      onClick={() => setActiveTab(id)}
-      className={`w-full flex items-center px-4 py-3 rounded-xl transition-all relative group ${
-        activeTab === id 
-          ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' 
-          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
-      }`}
-    >
-      <Icon size={20} className={`${activeTab === id ? 'scale-110' : 'group-hover:scale-110'} transition-transform`} />
-      {isSidebarOpen && <span className="ml-3 font-medium">{label}</span>}
-      {activeTab === id && <div className="absolute left-0 w-1 h-6 bg-white rounded-r-full" />}
-    </button>
-  );
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex font-sans selection:bg-blue-100 selection:text-blue-600">
-      {/* Sidebar */}
-      <aside 
-        className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-[#0a0a0b] transition-all duration-300 flex flex-col print:hidden sticky top-0 h-screen z-20`}
-      >
-        <div className="p-6 flex items-center justify-between">
-          <div className={`flex items-center space-x-2 text-white font-black text-2xl tracking-tighter ${!isSidebarOpen && 'hidden'}`}>
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
-              <Package size={20} />
-            </div>
-            <span>GUDANGPRO</span>
-          </div>
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
-            className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-white bg-gray-800/50 rounded-lg transition"
-          >
-            {isSidebarOpen ? <ChevronLeft size={20} /> : <Menu size={20} />}
-          </button>
-        </div>
-
-        <nav className="flex-1 px-3 py-4 space-y-2 overflow-y-auto custom-scrollbar">
-          <p className={`px-4 mb-2 text-[10px] font-bold text-gray-600 uppercase tracking-[0.2em] ${!isSidebarOpen && 'hidden'}`}>Menu Utama</p>
-          <NavItem id="dashboard" label="Dashboard" icon={LayoutDashboard} />
-          <NavItem id="master" label="Data Master" icon={Settings} />
-          <NavItem id="daftar_barang" label="Daftar Barang" icon={Package} />
-          
-          <div className="my-6 border-t border-gray-800/50 mx-4" />
-          
-          <p className={`px-4 mb-2 text-[10px] font-bold text-gray-600 uppercase tracking-[0.2em] ${!isSidebarOpen && 'hidden'}`}>Logistik</p>
-          <NavItem id="barang_masuk" label="Barang Masuk" icon={ArrowDownLeft} />
-          <NavItem id="barang_keluar" label="Barang Keluar" icon={ArrowUpRight} />
-          <NavItem id="database_transaksi" label="Basis Transaksi" icon={Database} />
-          
-          <div className="my-6 border-t border-gray-800/50 mx-4" />
-          
-          <p className={`px-4 mb-2 text-[10px] font-bold text-gray-600 uppercase tracking-[0.2em] ${!isSidebarOpen && 'hidden'}`}>Laporan</p>
-          <NavItem id="laporan_stok" label="Laporan Stok" icon={BarChart3} />
-          <NavItem id="trend_harga" label="Tren Harga" icon={TrendingUp} />
-        </nav>
-        
-        <div className="p-4 border-t border-gray-800 bg-[#0d0d0f]">
-          <div className={`flex items-center p-2 rounded-xl bg-gray-800/20 ${!isSidebarOpen ? 'justify-center' : 'space-x-3'}`}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-900/20">
-              AD
-            </div>
-            {isSidebarOpen && (
-              <div className="flex-1 overflow-hidden">
-                <p className="text-sm text-white font-bold truncate">Administrator</p>
-                <div className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-green-500 mr-2 shadow-[0_0_8px_#10b981]" />
-                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Online</p>
+                    <button id="btnCancelEdit" onclick="resetForm()" class="hidden bg-red-100 text-red-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-200 transition">
+                        Batal Edit
+                    </button>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-x-hidden">
-        {/* Header */}
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b px-8 flex items-center justify-between sticky top-0 z-10 print:hidden">
-          <div className="flex items-center space-x-4">
-             <div className="md:hidden">
-                <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-gray-500"><Menu /></button>
-             </div>
-             <h1 className="text-xl font-black text-gray-800 capitalize tracking-tight">
-               {activeTab.replace('_', ' ')}
-             </h1>
-          </div>
-          
-          <div className="flex items-center space-x-6">
-             <div className="hidden sm:flex items-center bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
-               <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse mr-3" />
-               <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Server Sync Active</p>
-             </div>
-             
-             <div className="flex items-center space-x-2">
-               <button className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition">
-                 <History size={20} />
-               </button>
-               <div className="h-8 w-[1px] bg-gray-200 mx-2" />
-               <button className="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-600 rounded-xl hover:bg-gray-100 transition border border-gray-100">
-                 <MoreVertical size={20} />
-               </button>
-             </div>
-          </div>
-        </header>
+                <form id="formPengambilan" class="p-8 space-y-8">
+                    <input type="hidden" id="editEntryId" value="">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Tanggal Pengambilan</label>
+                            <input type="date" id="tanggalInput" required 
+                                class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm focus:border-indigo-500 transition-all outline-none font-semibold">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Nama Penerima</label>
+                            <input type="text" id="namaPengambil" required placeholder="Nama personil..." 
+                                class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm focus:border-indigo-500 transition-all outline-none font-semibold">
+                        </div>
+                        <div class="space-y-2 md:col-span-2">
+                            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Unit Kerja / Ruangan</label>
+                            <input type="text" id="unitKerjaManual" required placeholder="Contoh: OK / VK / POLI GIGI" 
+                                class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm focus:border-indigo-500 transition-all outline-none font-semibold">
+                        </div>
+                    </div>
 
-        {/* Viewport */}
-        <div className="flex-1 bg-gray-50/50 pb-12">
-          {activeTab === 'dashboard' && <Dashboard />}
-          {activeTab === 'master' && <MasterSettings />}
-          {activeTab === 'daftar_barang' && <InventoryTable type="daftar_barang" />}
-          {activeTab === 'barang_masuk' && <InventoryTable type="barang_masuk" />}
-          {activeTab === 'barang_keluar' && <InventoryTable type="barang_keluar" />}
-          {activeTab === 'database_transaksi' && (
-            <div className="p-12 text-center max-w-2xl mx-auto">
-              <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                <Database size={40} />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Central Transaction Database</h2>
-              <p className="text-gray-500 mb-8">Data histori pergerakan stok dari seluruh gudang dan departemen tersimpan aman di sini.</p>
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 italic text-gray-400">
-                Fitur query lanjutan akan segera hadir pada update versi selanjutnya.
-              </div>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">Daftar Barang</h3>
+                            <button type="button" onclick="addRow()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">
+                                + Tambah Baris
+                            </button>
+                        </div>
+                        <div id="itemRows" class="space-y-3"></div>
+                    </div>
+
+                    <div class="pt-4">
+                        <button type="submit" id="submitBtn" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-lg hover:bg-indigo-600 transition-all shadow-xl active:scale-[0.99]">
+                            Simpan & Cetak Bukti
+                        </button>
+                    </div>
+                </form>
             </div>
-          )}
-          {activeTab === 'laporan_stok' && <StockReport />}
-          {activeTab === 'trend_harga' && <PriceTrend />}
         </div>
-      </main>
 
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          .print\:hidden { display: none !important; }
-          .print\:p-0 { padding: 0 !important; }
-          .print\:shadow-none { shadow: none !important; }
-          .print\:border-0 { border: 0 !important; }
-          .bg-white { background: white !important; }
-          table { width: 100% !important; }
-          div, table, tr, td, th { visibility: visible !important; }
-          main { position: absolute; left: 0; top: 0; width: 100%; }
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #333;
-          border-radius: 10px;
-        }
-      `}</style>
+        <!-- Tab Riwayat -->
+        <div id="tab-database" class="tab-content hidden space-y-4">
+            <div class="bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                    <h2 class="text-xl font-bold text-slate-800">Log Transaksi Cloud</h2>
+                    <span class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-full font-bold">LIVE SYNC</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 text-slate-400 font-bold text-[10px] uppercase">
+                            <tr>
+                                <th class="px-6 py-4">Tgl & ID</th>
+                                <th class="px-6 py-4">Penerima & Unit</th>
+                                <th class="px-6 py-4">Item</th>
+                                <th class="px-6 py-4 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="databaseBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Laporan -->
+        <div id="tab-report" class="tab-content hidden">
+            <div class="bg-white p-6 rounded-3xl shadow-lg border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+                <h2 class="text-xl font-bold text-slate-800">Laporan Rekap Bulanan</h2>
+                <input type="month" id="reportPeriod" onchange="renderReport()" class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
+            </div>
+            <div class="bg-white rounded-3xl shadow-lg overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-900 text-white font-bold text-[10px] uppercase">
+                        <tr>
+                            <th class="px-6 py-4">Tgl</th>
+                            <th class="px-6 py-4">Nama & Unit</th>
+                            <th class="px-6 py-4">Barang</th>
+                            <th class="px-6 py-4 text-center">Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab Master Barang -->
+        <div id="tab-master" class="tab-content hidden max-w-4xl mx-auto space-y-6">
+            <div class="bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden">
+                <div class="p-8 border-b border-slate-100 bg-slate-50/30 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-extrabold text-slate-800 uppercase tracking-tight">Master Barang Cloud</h2>
+                        <p class="text-slate-400 text-xs font-medium">Data tersinkronisasi untuk semua perangkat.</p>
+                    </div>
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <input type="text" id="newMasterItem" placeholder="Tambah barang..." class="flex-1 md:w-64 bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-500 font-semibold">
+                        <button onclick="addMasterItem()" class="bg-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition">Simpan</button>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div id="masterListGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Preview Modal -->
+    <div id="modalPreview" class="fixed inset-0 z-50 hidden bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-2 no-print">
+        <div class="bg-white w-full max-w-md max-h-[95vh] rounded-[2rem] overflow-hidden flex flex-col">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+                <span class="text-xs font-black text-slate-500 uppercase">Preview Cetak A4</span>
+                <div class="flex gap-2">
+                    <button onclick="closePreview()" class="text-xs font-bold text-slate-400">Tutup</button>
+                    <button onclick="window.print()" class="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold">Cetak Sekarang</button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 bg-slate-200 flex justify-center items-start">
+                <div class="bg-white shadow-2xl flex flex-col items-center justify-start" style="width: 210mm; min-height: 297mm; transform: scale(0.4); transform-origin: top center; padding-top: 0.5in;">
+                    <div id="previewSheet" style="width: 4.5in; min-height: 7.7in; padding: 0.2in; box-sizing: border-box; border: 1px dashed #ccc;"></div>
+                </div>
+            </div>
+        </div>
     </div>
-  );
+
+    <div id="printArea" class="print-only"></div>
+    <datalist id="masterBarangList"></datalist>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Config
+        const firebaseConfig = {
+  apiKey: "AIzaSyBp6R5Eg-msuKxd9bTRfMm5BVCDbymdP-8",
+  authDomain: "gudang-rsu-dk.firebaseapp.com",
+  projectId: "gudang-rsu-dk",
+  storageBucket: "gudang-rsu-dk.firebasestorage.app",
+  messagingSenderId: "91825157272",
+  appId: "1:91825157272:web:44bf7d7cd4f8280fa18ced",
+  measurementId: "G-961497SD4H"
 };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-export default App;
+        // State Global
+        let transactions = [];
+        let masterItems = [];
+        let currentUser = null;
+
+        // Inisialisasi Auth
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth Error:", error);
+                alert("Gagal terhubung ke server. Pastikan koneksi internet aktif.");
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            if (user) {
+                document.getElementById('userStatus').innerText = `User ID: ${user.uid}`;
+                document.getElementById('loadingOverlay').style.display = 'none';
+                startSync();
+            }
+        });
+
+        // Sinkronisasi Firestore (RULE 1 & 2)
+        const startSync = () => {
+            if (!currentUser) return;
+
+            // Sync Transaksi (Public Data)
+            const transRef = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
+            onSnapshot(transRef, (snapshot) => {
+                transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Sort manual (Rule 2: No orderBy in complex query)
+                transactions.sort((a, b) => b.timestamp - a.timestamp);
+                renderDatabase();
+                renderReport();
+            }, (err) => console.error("Sync Trans Error:", err));
+
+            // Sync Master Barang (Public Data)
+            const masterRef = collection(db, 'artifacts', appId, 'public', 'data', 'master_items');
+            onSnapshot(masterRef, (snapshot) => {
+                masterItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderMaster();
+                updateDatalist();
+            }, (err) => console.error("Sync Master Error:", err));
+        };
+
+        // --- Fungsi UI & Bisnis ---
+
+        window.switchTab = (tab) => {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.getElementById('tab-' + tab).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(b => {
+                b.classList.remove('tab-active');
+                b.classList.add('text-indigo-200');
+            });
+            document.getElementById('btn-' + tab).classList.add('tab-active');
+            
+            if(tab === 'database') renderDatabase();
+            if(tab === 'report') renderReport();
+            if(tab === 'master') renderMaster();
+        };
+
+        const updateDatalist = () => {
+            const dl = document.getElementById('masterBarangList');
+            dl.innerHTML = masterItems.map(item => `<option value="${item.name}">`).join('');
+        };
+
+        const renderMaster = () => {
+            const grid = document.getElementById('masterListGrid');
+            grid.innerHTML = masterItems.sort((a,b) => a.name.localeCompare(b.name)).map((item) => `
+                <div class="flex items-center justify-between bg-white border border-slate-100 p-3 rounded-xl shadow-sm hover:border-indigo-200 transition-all group">
+                    <span class="text-sm font-semibold text-slate-600 truncate mr-2">${item.name}</span>
+                    <button onclick="removeMasterItem('${item.id}')" class="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                </div>
+            `).join('');
+        };
+
+        window.addMasterItem = async () => {
+            if (!currentUser) return;
+            const input = document.getElementById('newMasterItem');
+            const val = input.value.trim();
+            if(val) {
+                try {
+                    const masterRef = collection(db, 'artifacts', appId, 'public', 'data', 'master_items');
+                    await addDoc(masterRef, { name: val, createdAt: Date.now() });
+                    input.value = "";
+                } catch (e) { alert("Gagal menyimpan data."); }
+            }
+        };
+
+        window.removeMasterItem = async (id) => {
+            if (!currentUser) return;
+            if(confirm('Hapus item ini dari Master?')) {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_items', id));
+                } catch (e) { alert("Gagal menghapus data."); }
+            }
+        };
+
+        window.addRow = (nama = '', qty = 1, satuan = '') => {
+            const container = document.getElementById('itemRows');
+            const div = document.createElement('div');
+            div.className = "flex gap-2 bg-slate-50 p-3 rounded-xl";
+            div.innerHTML = `
+                <input type="text" placeholder="Cari barang..." value="${nama}" list="masterBarangList" class="item-nama flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 outline-none font-medium">
+                <input type="number" value="${qty}" class="item-qty w-16 bg-white border border-slate-200 rounded-lg px-2 py-2 text-sm text-center focus:border-indigo-500 outline-none font-bold text-indigo-600">
+                <input type="text" value="${satuan}" placeholder="Sat" class="item-satuan w-16 bg-white border border-slate-200 rounded-lg px-2 py-2 text-sm text-center uppercase focus:border-indigo-500 outline-none">
+                <button type="button" onclick="this.parentElement.remove()" class="text-red-300 hover:text-red-600 px-2 transition-colors">×</button>
+            `;
+            container.appendChild(div);
+        };
+
+        document.getElementById('formPengambilan').onsubmit = async function(e) {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            const rawDate = document.getElementById('tanggalInput').value;
+            const items = Array.from(document.querySelectorAll('#itemRows > div')).map(r => ({
+                nama: r.querySelector('.item-nama').value.trim(),
+                qty: r.querySelector('.item-qty').value,
+                satuan: r.querySelector('.item-satuan').value.trim()
+            }));
+
+            if(items.length === 0 || items.some(it => it.nama === "")) return;
+
+            const editId = document.getElementById('editEntryId').value;
+            const entryDate = new Date(rawDate);
+            const formattedDate = entryDate.toLocaleDateString('id-ID', {day: '2-digit', month: 'short', year: 'numeric'});
+
+            const payload = {
+                namaPengambil: document.getElementById('namaPengambil').value.trim(),
+                unitKerja: document.getElementById('unitKerjaManual').value.trim(),
+                items: items,
+                tanggal: formattedDate,
+                isoDate: rawDate,
+                timestamp: Date.now(),
+                createdBy: currentUser.uid
+            };
+
+            try {
+                let finalId;
+                const transRef = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
+                
+                if(editId) {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', editId), payload);
+                    finalId = editId;
+                } else {
+                    payload.regCode = `TRX-${transactions.length + 101}`;
+                    const docRef = await addDoc(transRef, payload);
+                    finalId = docRef.id;
+                }
+                
+                showPreview(finalId);
+                resetForm();
+            } catch (err) {
+                alert("Gagal sinkronisasi ke cloud.");
+            }
+        };
+
+        window.resetForm = () => {
+            document.getElementById('formPengambilan').reset();
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('tanggalInput').value = today;
+            document.getElementById('editEntryId').value = "";
+            document.getElementById('itemRows').innerHTML = '';
+            document.getElementById('formTitle').innerText = "Form Pengambilan";
+            document.getElementById('submitBtn').innerText = "Simpan & Cetak Bukti";
+            document.getElementById('btnCancelEdit').classList.add('hidden');
+            addRow();
+        };
+
+        window.editEntry = (id) => {
+            const entry = transactions.find(d => d.id === id);
+            if (!entry) return;
+            document.getElementById('editEntryId').value = entry.id;
+            document.getElementById('tanggalInput').value = entry.isoDate || new Date().toISOString().split('T')[0];
+            document.getElementById('namaPengambil').value = entry.namaPengambil;
+            document.getElementById('unitKerjaManual').value = entry.unitKerja;
+            document.getElementById('itemRows').innerHTML = '';
+            entry.items.forEach(it => addRow(it.nama, it.qty, it.satuan));
+            document.getElementById('formTitle').innerText = "Update Transaksi Cloud";
+            document.getElementById('submitBtn').innerText = "Simpan Perubahan Cloud";
+            document.getElementById('btnCancelEdit').classList.remove('hidden');
+            switchTab('input');
+        };
+
+        const renderDatabase = () => {
+            const body = document.getElementById('databaseBody');
+            body.innerHTML = transactions.map(row => `
+                <tr class="hover:bg-slate-50 transition-colors border-b border-slate-50">
+                    <td class="px-6 py-4">
+                        <div class="font-bold text-indigo-600">${row.regCode || 'NEW'}</div>
+                        <div class="text-[10px] text-slate-400 font-bold uppercase">${row.tanggal}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="font-bold uppercase text-slate-700 leading-tight">${row.namaPengambil}</div>
+                        <div class="text-[9px] text-slate-400 font-bold uppercase tracking-tight">${row.unitKerja}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex flex-wrap gap-1 max-w-xs">
+                            ${row.items.map(it => `
+                                <span class="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100 font-bold uppercase">
+                                    ${it.nama} (${it.qty})
+                                </span>
+                            `).join('')}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <div class="flex items-center justify-center gap-4">
+                            <button onclick="showPreview('${row.id}')" class="text-indigo-600 hover:text-indigo-800 font-bold text-xs">CETAK</button>
+                            <button onclick="editEntry('${row.id}')" class="text-amber-500 hover:text-amber-700 font-bold text-xs">EDIT</button>
+                            <button onclick="deleteEntry('${row.id}')" class="text-red-500 hover:text-red-700 font-bold text-xs">HAPUS</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        };
+
+        window.deleteEntry = async (id) => {
+            if (!currentUser) return;
+            if (confirm('Hapus riwayat ini selamanya dari Cloud?')) {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id));
+                } catch (e) { alert("Gagal menghapus data."); }
+            }
+        };
+
+        window.renderReport = () => {
+            const periodInput = document.getElementById('reportPeriod');
+            if(!periodInput.value) return;
+            const [year, month] = periodInput.value.split('-');
+            
+            const filteredData = transactions.filter(d => {
+                const dDate = new Date(d.isoDate);
+                return dDate.getFullYear() == year && (dDate.getMonth() + 1) == month;
+            });
+
+            const body = document.getElementById('reportTableBody');
+            let html = "";
+            filteredData.forEach(entry => {
+                entry.items.forEach(it => {
+                    html += `
+                        <tr class="hover:bg-slate-50 border-b border-slate-100">
+                            <td class="px-6 py-3 text-[10px] font-bold text-slate-400">${entry.tanggal}</td>
+                            <td class="px-6 py-3">
+                                <div class="font-bold uppercase text-slate-700">${entry.namaPengambil}</div>
+                                <div class="text-[9px] font-bold text-slate-400 uppercase">${entry.unitKerja}</div>
+                            </td>
+                            <td class="px-6 py-3 font-semibold uppercase text-indigo-600 text-xs">${it.nama}</td>
+                            <td class="px-6 py-3 text-center font-black">${it.qty} <small class="font-normal text-slate-400">${it.satuan}</small></td>
+                        </tr>
+                    `;
+                });
+            });
+            body.innerHTML = html || '<tr><td colspan="4" class="p-12 text-center text-slate-300 italic">Data tidak ditemukan untuk periode ini.</td></tr>';
+        };
+
+        window.showPreview = (id) => {
+            const entry = transactions.find(d => d.id === id);
+            if(!entry) return;
+
+            const content = `
+                <div style="font-family: 'Plus Jakarta Sans', sans-serif; color: #000; width: 100%; box-sizing: border-box; background: white;">
+                    <div style="text-align: center; border-bottom: 2px solid #000; padding: 2px 0 6px 0;">
+                        <h2 style="margin: 0; font-size: 11pt; font-weight: 800; letter-spacing: -0.01em;">RSU DADI KELUARGA</h2>
+                        <p style="margin: 0; font-size: 7pt; font-weight: 700; color: #333; letter-spacing: 1px;">BUKTI PENGAMBILAN LOGISTIK</p>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 7.5pt; padding: 8px 0; border-bottom: 1px dashed #000; margin-bottom: 10px;">
+                        <div style="width: 65%;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr><td style="width: 25%; color: #666;">Unit Kerja</td><td>: <b>${entry.unitKerja.toUpperCase()}</b></td></tr>
+                                <tr><td style="color: #666;">Penerima</td><td>: <b>${entry.namaPengambil.toUpperCase()}</b></td></tr>
+                            </table>
+                        </div>
+                        <div style="text-align: right; width: 35%;">
+                            <span style="display: block; font-family: 'JetBrains Mono'; font-weight: 800; font-size: 8pt;">${entry.regCode}</span>
+                            <span style="display: block; font-size: 6.5pt; margin-top: 2px;">Tgl: ${entry.tanggal}</span>
+                        </div>
+                    </div>
+                    <div style="min-height: 8.5cm;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 7.5pt;">
+                            <thead>
+                                <tr style="border-bottom: 1.5px solid #000;">
+                                    <th style="padding: 5px 2px; text-align: left; width: 60%; text-transform: uppercase; font-size: 6.5pt;">Item Barang</th>
+                                    <th style="padding: 5px 2px; text-align: center; width: 15%; text-transform: uppercase; font-size: 6.5pt;">Qty</th>
+                                    <th style="padding: 5px 2px; text-align: center; width: 25%; text-transform: uppercase; font-size: 6.5pt;">Satuan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${entry.items.map(it => `
+                                <tr style="border-bottom: 0.5px solid #eee;">
+                                    <td style="padding: 6px 2px; font-weight: 500; text-transform: uppercase;">${it.nama}</td>
+                                    <td style="padding: 6px 2px; text-align: center; font-weight: 800;">${it.qty}</td>
+                                    <td style="padding: 6px 2px; text-align: center; text-transform: uppercase; color: #444;">${it.satuan || '-'}</td>
+                                </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="margin-top: 40px; display: flex; justify-content: space-between; font-size: 7.5pt; text-align: center;">
+                        <div style="width: 120px;">
+                            <p style="margin-bottom: 50px; font-size: 6.5pt; color: #444;">Petugas Logistik,</p>
+                            <p style="border-top: 1px solid #000; padding-top: 4px;">( .................... )</p>
+                        </div>
+                        <div style="width: 120px;">
+                            <p style="margin-bottom: 50px; font-size: 6.5pt; color: #444;">Penerima,</p>
+                            <p style="font-weight: 800; border-top: 1px solid #000; padding-top: 4px;">${entry.namaPengambil.toUpperCase()}</p>
+                        </div>
+                    </div>
+                    <div style="text-align: center; font-size: 5.5pt; margin-top: 30px; border-top: 1px solid #f1f1f1; padding-top: 10px; color: #bbb;">
+                        Dicetak secara cloud otomatis oleh Gudang RSU Dadi Keluarga
+                    </div>
+                </div>
+            `;
+            document.getElementById('previewSheet').innerHTML = content;
+            document.getElementById('printArea').innerHTML = content;
+            document.getElementById('modalPreview').classList.remove('hidden');
+        }
+
+        window.closePreview = () => document.getElementById('modalPreview').classList.add('hidden');
+
+        // Initial Start
+        initAuth();
+        resetForm();
+
+    </script>
+</body>
+</html>
