@@ -3,593 +3,1119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal Inventory RSU Dadi Keluarga</title>
+    <title>GudangSmart - Inventory System</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: #f8fafc;
-        }
-        
-        .tab-active {
-            background-color: white;
-            color: #4f46e5;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-        }
-
-        @media print {
-            @page {
-                size: A4 portrait;
-                margin: 0; 
-            }
-            .no-print { display: none !important; }
-            .print-only { 
-                display: flex !important; 
-                flex-direction: column;
-                align-items: center; 
-                justify-content: flex-start;
-                width: 100%;
-                min-height: 100vh;
-                background: white;
-                padding-top: 0.5in; 
-            }
-            body { 
-                background: white; 
-                margin: 0;
-                padding: 0;
-            }
-            #printArea {
-                width: 4.5in;
-                height: 7.7in;
-                padding: 0.2in;
-                box-sizing: border-box;
-                border: 0.5px solid #eee;
-                margin: 0 auto; 
-            }
-        }
-
-        .print-only { display: none; }
+        body { background-color: #f3f4f6; font-family: 'Inter', sans-serif; }
+        .active-nav { background-color: #2563eb; color: white; }
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-
-        /* Loading Overlay */
-        #loadingOverlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(255,255,255,0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
+        .table-container { max-height: calc(100vh - 300px); overflow-y: auto; }
+        .chart-container { position: relative; height: 350px; width: 100%; }
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
+        @media print {
+            aside, header, .no-print, button, select { display: none !important; }
+            main { padding: 0 !important; width: 100% !important; }
+            .bg-white { box-shadow: none !important; border: none !important; }
+            .table-container { max-height: none !important; overflow: visible !important; }
         }
     </style>
 </head>
-<body class="min-h-screen pb-12">
+<body>
+    <div id="root"></div>
 
-    <div id="loadingOverlay">
-        <div class="flex flex-col items-center">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-700"></div>
-            <p class="mt-4 text-sm font-bold text-indigo-700">Menghubungkan ke Cloud...</p>
-        </div>
-    </div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
 
-    <!-- Header Aplikasi -->
-    <header class="bg-indigo-700 text-white shadow-lg no-print">
-        <div class="container mx-auto px-6 py-6">
-            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div class="flex items-center gap-4">
-                    <div class="bg-white p-2 rounded-xl">
-                        <svg class="w-8 h-8 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                    </div>
-                    <div>
-                        <h1 class="text-xl font-extrabold tracking-tight italic">RSU DADI KELUARGA</h1>
-                        <p id="userStatus" class="text-indigo-100 text-[10px] font-bold uppercase tracking-[0.2em]">Memuat User...</p>
-                    </div>
-                </div>
-                
-                <nav class="flex bg-indigo-800/50 p-1 rounded-2xl overflow-x-auto">
-                    <button onclick="switchTab('input')" id="btn-input" class="nav-btn px-6 py-2 rounded-xl text-sm font-bold transition-all tab-active whitespace-nowrap">Input</button>
-                    <button onclick="switchTab('database')" id="btn-database" class="nav-btn px-6 py-2 rounded-xl text-sm font-bold transition-all text-indigo-200 hover:text-white whitespace-nowrap">Riwayat</button>
-                    <button onclick="switchTab('report')" id="btn-report" class="nav-btn px-6 py-2 rounded-xl text-sm font-bold transition-all text-indigo-200 hover:text-white whitespace-nowrap">Laporan</button>
-                    <button onclick="switchTab('master')" id="btn-master" class="nav-btn px-6 py-2 rounded-xl text-sm font-bold transition-all text-indigo-200 hover:text-white whitespace-nowrap">Master Barang</button>
-                </nav>
-            </div>
-        </div>
-    </header>
-
-    <main class="container mx-auto px-4 mt-8 no-print">
-        <!-- Tab Input -->
-        <div id="tab-input" class="tab-content max-w-3xl mx-auto space-y-6">
-            <div class="bg-white rounded-[2rem] shadow-2xl shadow-indigo-100 border border-slate-100 overflow-hidden">
-                <div class="p-8 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center">
-                    <div>
-                        <h2 id="formTitle" class="text-2xl font-black text-slate-800">Form Pengambilan</h2>
-                        <p class="text-slate-400 text-sm">Lengkapi data pengambilan barang di bawah ini.</p>
-                    </div>
-                    <button id="btnCancelEdit" onclick="resetForm()" class="hidden bg-red-100 text-red-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-200 transition">
-                        Batal Edit
-                    </button>
-                </div>
-
-                <form id="formPengambilan" class="p-8 space-y-8">
-                    <input type="hidden" id="editEntryId" value="">
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-2">
-                            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Tanggal Pengambilan</label>
-                            <input type="date" id="tanggalInput" required 
-                                class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm focus:border-indigo-500 transition-all outline-none font-semibold">
-                        </div>
-                        <div class="space-y-2">
-                            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Nama Penerima</label>
-                            <input type="text" id="namaPengambil" required placeholder="Nama personil..." 
-                                class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm focus:border-indigo-500 transition-all outline-none font-semibold">
-                        </div>
-                        <div class="space-y-2 md:col-span-2">
-                            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Unit Kerja / Ruangan</label>
-                            <input type="text" id="unitKerjaManual" required placeholder="Contoh: OK / VK / POLI GIGI" 
-                                class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm focus:border-indigo-500 transition-all outline-none font-semibold">
-                        </div>
-                    </div>
-
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center border-b border-slate-100 pb-2">
-                            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest">Daftar Barang</h3>
-                            <button type="button" onclick="addRow()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">
-                                + Tambah Baris
-                            </button>
-                        </div>
-                        <div id="itemRows" class="space-y-3"></div>
-                    </div>
-
-                    <div class="pt-4">
-                        <button type="submit" id="submitBtn" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-lg hover:bg-indigo-600 transition-all shadow-xl active:scale-[0.99]">
-                            Simpan & Cetak Bukti
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Tab Riwayat -->
-        <div id="tab-database" class="tab-content hidden space-y-4">
-            <div class="bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden">
-                <div class="p-6 border-b border-slate-100 flex justify-between items-center">
-                    <h2 class="text-xl font-bold text-slate-800">Log Transaksi Cloud</h2>
-                    <span class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-full font-bold">LIVE SYNC</span>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-slate-50 text-slate-400 font-bold text-[10px] uppercase">
-                            <tr>
-                                <th class="px-6 py-4">Tgl & ID</th>
-                                <th class="px-6 py-4">Penerima & Unit</th>
-                                <th class="px-6 py-4">Item</th>
-                                <th class="px-6 py-4 text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="databaseBody" class="divide-y divide-slate-100"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab Laporan -->
-        <div id="tab-report" class="tab-content hidden">
-            <div class="bg-white p-6 rounded-3xl shadow-lg border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
-                <h2 class="text-xl font-bold text-slate-800">Laporan Rekap Bulanan</h2>
-                <input type="month" id="reportPeriod" onchange="renderReport()" class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
-            </div>
-            <div class="bg-white rounded-3xl shadow-lg overflow-hidden">
-                <table class="w-full text-sm">
-                    <thead class="bg-slate-900 text-white font-bold text-[10px] uppercase">
-                        <tr>
-                            <th class="px-6 py-4">Tgl</th>
-                            <th class="px-6 py-4">Nama & Unit</th>
-                            <th class="px-6 py-4">Barang</th>
-                            <th class="px-6 py-4 text-center">Qty</th>
-                        </tr>
-                    </thead>
-                    <tbody id="reportTableBody" class="divide-y divide-slate-100"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Tab Master Barang -->
-        <div id="tab-master" class="tab-content hidden max-w-4xl mx-auto space-y-6">
-            <div class="bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden">
-                <div class="p-8 border-b border-slate-100 bg-slate-50/30 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div>
-                        <h2 class="text-xl font-extrabold text-slate-800 uppercase tracking-tight">Master Barang Cloud</h2>
-                        <p class="text-slate-400 text-xs font-medium">Data tersinkronisasi untuk semua perangkat.</p>
-                    </div>
-                    <div class="flex gap-2 w-full md:w-auto">
-                        <input type="text" id="newMasterItem" placeholder="Tambah barang..." class="flex-1 md:w-64 bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-500 font-semibold">
-                        <button onclick="addMasterItem()" class="bg-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition">Simpan</button>
-                    </div>
-                </div>
-                <div class="p-6">
-                    <div id="masterListGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"></div>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <!-- Preview Modal -->
-    <div id="modalPreview" class="fixed inset-0 z-50 hidden bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-2 no-print">
-        <div class="bg-white w-full max-w-md max-h-[95vh] rounded-[2rem] overflow-hidden flex flex-col">
-            <div class="p-4 border-b border-slate-100 flex justify-between items-center">
-                <span class="text-xs font-black text-slate-500 uppercase">Preview Cetak A4</span>
-                <div class="flex gap-2">
-                    <button onclick="closePreview()" class="text-xs font-bold text-slate-400">Tutup</button>
-                    <button onclick="window.print()" class="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold">Cetak Sekarang</button>
-                </div>
-            </div>
-            <div class="flex-1 overflow-y-auto p-4 bg-slate-200 flex justify-center items-start">
-                <div class="bg-white shadow-2xl flex flex-col items-center justify-start" style="width: 210mm; min-height: 297mm; transform: scale(0.4); transform-origin: top center; padding-top: 0.5in;">
-                    <div id="previewSheet" style="width: 4.5in; min-height: 7.7in; padding: 0.2in; box-sizing: border-box; border: 1px dashed #ccc;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="printArea" class="print-only"></div>
-    <datalist id="masterBarangList"></datalist>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase Config
-        const firebaseConfig = {
-  apiKey: "AIzaSyBp6R5Eg-msuKxd9bTRfMm5BVCDbymdP-8",
-  authDomain: "gudang-rsu-dk.firebaseapp.com",
-  projectId: "gudang-rsu-dk",
-  storageBucket: "gudang-rsu-dk.firebasestorage.app",
-  messagingSenderId: "91825157272",
-  appId: "1:91825157272:web:44bf7d7cd4f8280fa18ced",
-  measurementId: "G-961497SD4H"
-};
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-        // State Global
-        let transactions = [];
-        let masterItems = [];
-        let currentUser = null;
-
-        // Inisialisasi Auth
-        const initAuth = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Auth Error:", error);
-                alert("Gagal terhubung ke server. Pastikan koneksi internet aktif.");
-            }
-        };
-
-        onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-            if (user) {
-                document.getElementById('userStatus').innerText = `User ID: ${user.uid}`;
-                document.getElementById('loadingOverlay').style.display = 'none';
-                startSync();
-            }
-        });
-
-        // Sinkronisasi Firestore (RULE 1 & 2)
-        const startSync = () => {
-            if (!currentUser) return;
-
-            // Sync Transaksi (Public Data)
-            const transRef = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
-            onSnapshot(transRef, (snapshot) => {
-                transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Sort manual (Rule 2: No orderBy in complex query)
-                transactions.sort((a, b) => b.timestamp - a.timestamp);
-                renderDatabase();
-                renderReport();
-            }, (err) => console.error("Sync Trans Error:", err));
-
-            // Sync Master Barang (Public Data)
-            const masterRef = collection(db, 'artifacts', appId, 'public', 'data', 'master_items');
-            onSnapshot(masterRef, (snapshot) => {
-                masterItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderMaster();
-                updateDatalist();
-            }, (err) => console.error("Sync Master Error:", err));
-        };
-
-        // --- Fungsi UI & Bisnis ---
-
-        window.switchTab = (tab) => {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
-            document.getElementById('tab-' + tab).classList.remove('hidden');
-            document.querySelectorAll('.nav-btn').forEach(b => {
-                b.classList.remove('tab-active');
-                b.classList.add('text-indigo-200');
-            });
-            document.getElementById('btn-' + tab).classList.add('tab-active');
+        const App = () => {
+            // --- State ---
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [categories, setCategories] = useState(['Alat Tulis Kantor', 'Plastik', 'PHP', 'Alat Kebersihan']);
             
-            if(tab === 'database') renderDatabase();
-            if(tab === 'report') renderReport();
-            if(tab === 'master') renderMaster();
-        };
+            const [masterBarang, setMasterBarang] = useState([
+                { id: 1, nama: 'Kertas A4', kategori: 'Alat Tulis Kantor' },
+                { id: 2, nama: 'Kantong Kresek L', kategori: 'Plastik' },
+                { id: 3, nama: 'Sapu Ijuk', kategori: 'Alat Kebersihan' }
+            ]);
+            
+            const [transaksiMasuk, setTransaksiMasuk] = useState([]);
+            const [transaksiKeluar, setTransaksiKeluar] = useState([]);
+            
+            const [newCategory, setNewCategory] = useState('');
+            const [formMaster, setFormMaster] = useState({ nama: '', kategori: 'Alat Tulis Kantor' });
+            const [importCategory, setImportCategory] = useState('Alat Tulis Kantor');
+            
+            // Edit State Master
+            const [editingItem, setEditingItem] = useState(null);
+            const [editNameValue, setEditNameValue] = useState('');
 
-        const updateDatalist = () => {
-            const dl = document.getElementById('masterBarangList');
-            dl.innerHTML = masterItems.map(item => `<option value="${item.name}">`).join('');
-        };
+            // Edit State Kategori
+            const [editingCategory, setEditingCategory] = useState(null);
+            const [editCategoryValue, setEditCategoryValue] = useState('');
 
-        const renderMaster = () => {
-            const grid = document.getElementById('masterListGrid');
-            grid.innerHTML = masterItems.sort((a,b) => a.name.localeCompare(b.name)).map((item) => `
-                <div class="flex items-center justify-between bg-white border border-slate-100 p-3 rounded-xl shadow-sm hover:border-indigo-200 transition-all group">
-                    <span class="text-sm font-semibold text-slate-600 truncate mr-2">${item.name}</span>
-                    <button onclick="removeMasterItem('${item.id}')" class="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
-                </div>
-            `).join('');
-        };
+            // Edit State Transaksi
+            const [editingTransaksi, setEditingTransaksi] = useState(null);
 
-        window.addMasterItem = async () => {
-            if (!currentUser) return;
-            const input = document.getElementById('newMasterItem');
-            const val = input.value.trim();
-            if(val) {
-                try {
-                    const masterRef = collection(db, 'artifacts', appId, 'public', 'data', 'master_items');
-                    await addDoc(masterRef, { name: val, createdAt: Date.now() });
-                    input.value = "";
-                } catch (e) { alert("Gagal menyimpan data."); }
-            }
-        };
+            // State Riwayat
+            const [selectedRuangan, setSelectedRuangan] = useState('');
+            const [selectedBarangId, setSelectedBarangId] = useState('');
 
-        window.removeMasterItem = async (id) => {
-            if (!currentUser) return;
-            if(confirm('Hapus item ini dari Master?')) {
-                try {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'master_items', id));
-                } catch (e) { alert("Gagal menghapus data."); }
-            }
-        };
+            // State Tren Harga
+            const [priceTrendKategori, setPriceTrendKategori] = useState('');
+            const [priceTrendBarangId, setPriceTrendBarangId] = useState('');
 
-        window.addRow = (nama = '', qty = 1, satuan = '') => {
-            const container = document.getElementById('itemRows');
-            const div = document.createElement('div');
-            div.className = "flex gap-2 bg-slate-50 p-3 rounded-xl";
-            div.innerHTML = `
-                <input type="text" placeholder="Cari barang..." value="${nama}" list="masterBarangList" class="item-nama flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 outline-none font-medium">
-                <input type="number" value="${qty}" class="item-qty w-16 bg-white border border-slate-200 rounded-lg px-2 py-2 text-sm text-center focus:border-indigo-500 outline-none font-bold text-indigo-600">
-                <input type="text" value="${satuan}" placeholder="Sat" class="item-satuan w-16 bg-white border border-slate-200 rounded-lg px-2 py-2 text-sm text-center uppercase focus:border-indigo-500 outline-none">
-                <button type="button" onclick="this.parentElement.remove()" class="text-red-300 hover:text-red-600 px-2 transition-colors">×</button>
-            `;
-            container.appendChild(div);
-        };
+            const today = new Date().toISOString().split('T')[0];
+            const currentYear = new Date().getFullYear();
 
-        document.getElementById('formPengambilan').onsubmit = async function(e) {
-            e.preventDefault();
-            if (!currentUser) return;
+            // Multi-Item Input State
+            const [multiInputMasuk, setMultiInputMasuk] = useState([{ idBarang: '', jumlah: '', harga: '', kategori: '' }]);
+            const [multiInputKeluar, setMultiInputKeluar] = useState([{ idBarang: '', jumlah: '', kategori: '' }]);
+            const [globalTanggal, setGlobalTanggal] = useState(today);
+            const [globalVendor, setGlobalVendor] = useState('');
+            const [globalTujuan, setGlobalTujuan] = useState('');
 
-            const rawDate = document.getElementById('tanggalInput').value;
-            const items = Array.from(document.querySelectorAll('#itemRows > div')).map(r => ({
-                nama: r.querySelector('.item-nama').value.trim(),
-                qty: r.querySelector('.item-qty').value,
-                satuan: r.querySelector('.item-satuan').value.trim()
-            }));
+            const chartRef = useRef(null);
+            const priceChartRef = useRef(null);
+            const fileInputRef = useRef(null);
 
-            if(items.length === 0 || items.some(it => it.nama === "")) return;
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [activeTab, masterBarang, categories, editingItem, editingCategory, selectedRuangan, selectedBarangId, multiInputMasuk, multiInputKeluar, transaksiMasuk, transaksiKeluar, editingTransaksi, priceTrendKategori, priceTrendBarangId]);
 
-            const editId = document.getElementById('editEntryId').value;
-            const entryDate = new Date(rawDate);
-            const formattedDate = entryDate.toLocaleDateString('id-ID', {day: '2-digit', month: 'short', year: 'numeric'});
+            // Database Gabungan untuk menu Edit
+            const allTransactions = useMemo(() => {
+                const m = transaksiMasuk.map(t => ({ ...t, tipe: 'MASUK' }));
+                const k = transaksiKeluar.map(t => ({ ...t, tipe: 'KELUAR' }));
+                return [...m, ...k].sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+            }, [transaksiMasuk, transaksiKeluar]);
 
-            const payload = {
-                namaPengambil: document.getElementById('namaPengambil').value.trim(),
-                unitKerja: document.getElementById('unitKerjaManual').value.trim(),
-                items: items,
-                tanggal: formattedDate,
-                isoDate: rawDate,
-                timestamp: Date.now(),
-                createdBy: currentUser.uid
+            // Riwayat Per Ruangan
+            const daftarRuangan = useMemo(() => {
+                const uniqueRuangan = [...new Set(transaksiKeluar.map(t => t.tujuan).filter(t => t))];
+                return uniqueRuangan.sort();
+            }, [transaksiKeluar]);
+
+            const detailRiwayatRuangan = useMemo(() => {
+                if (!selectedRuangan) return [];
+                return transaksiKeluar
+                    .filter(t => t.tujuan === selectedRuangan)
+                    .sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+            }, [selectedRuangan, transaksiKeluar]);
+
+            // Riwayat Per Barang (Kartu Stok)
+            const detailRiwayatBarang = useMemo(() => {
+                if (!selectedBarangId) return [];
+                const id = parseInt(selectedBarangId);
+                const masuk = transaksiMasuk.filter(t => t.idBarang === id).map(t => ({ ...t, jenis: 'MASUK' }));
+                const keluar = transaksiKeluar.filter(t => t.idBarang === id).map(t => ({ ...t, jenis: 'KELUAR' }));
+                return [...masuk, ...keluar].sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+            }, [selectedBarangId, transaksiMasuk, transaksiKeluar]);
+
+            const infoBarangTerpilih = useMemo(() => {
+                if (!selectedBarangId) return null;
+                const barang = masterBarang.find(b => b.id === parseInt(selectedBarangId));
+                const riwayat = detailRiwayatBarang;
+                const tMasuk = riwayat.filter(r => r.jenis === 'MASUK').reduce((s, r) => s + r.jumlah, 0);
+                const tKeluar = riwayat.filter(r => r.jenis === 'KELUAR').reduce((s, r) => s + r.jumlah, 0);
+                return { ...barang, tMasuk, tKeluar, stok: tMasuk - tKeluar };
+            }, [selectedBarangId, masterBarang, detailRiwayatBarang]);
+
+            // Perhitungan Tren Harga
+            const dataTrenHarga = useMemo(() => {
+                if (!priceTrendBarangId) return [];
+                return transaksiMasuk
+                    .filter(t => t.idBarang === parseInt(priceTrendBarangId))
+                    .sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal))
+                    .map(t => ({
+                        tanggal: t.tanggal,
+                        harga: t.harga
+                    }));
+            }, [priceTrendBarangId, transaksiMasuk]);
+
+            const statistikHarga = useMemo(() => {
+                if (dataTrenHarga.length === 0) return null;
+                const hargas = dataTrenHarga.map(d => d.harga);
+                return {
+                    terakhir: hargas[hargas.length - 1],
+                    tertinggi: Math.max(...hargas),
+                    terendah: Math.min(...hargas)
+                };
+            }, [dataTrenHarga]);
+
+            // Perhitungan Total per Kategori untuk Dashboard
+            const summaryKategori = useMemo(() => {
+                return categories.map(cat => {
+                    const totalHarga = transaksiMasuk
+                        .filter(t => t.kategori === cat)
+                        .reduce((acc, curr) => acc + (curr.jumlah * (curr.harga || 0)), 0);
+                    const totalUnit = transaksiMasuk
+                        .filter(t => t.kategori === cat)
+                        .reduce((acc, curr) => acc + curr.jumlah, 0);
+                    return { kategori: cat, totalHarga, totalUnit };
+                });
+            }, [categories, transaksiMasuk]);
+
+            // Perhitungan Persentase Anggaran
+            const budgetAnalysis = useMemo(() => {
+                const grandTotal = summaryKategori.reduce((acc, curr) => acc + curr.totalHarga, 0);
+                return summaryKategori.map(item => ({
+                    ...item,
+                    persen: grandTotal > 0 ? ((item.totalHarga / grandTotal) * 100).toFixed(1) : 0
+                })).sort((a, b) => b.totalHarga - a.totalHarga);
+            }, [summaryKategori]);
+
+            // Helper Export Excel
+            const exportToExcel = (data, fileName) => {
+                const worksheet = XLSX.utils.json_to_sheet(data);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+                XLSX.writeFile(workbook, `${fileName}.xlsx`);
             };
 
-            try {
-                let finalId;
-                const transRef = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
-                
-                if(editId) {
-                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', editId), payload);
-                    finalId = editId;
-                } else {
-                    payload.regCode = `TRX-${transactions.length + 101}`;
-                    const docRef = await addDoc(transRef, payload);
-                    finalId = docRef.id;
+            const printReport = () => {
+                window.print();
+            };
+
+            // Dashboard Chart
+            useEffect(() => {
+                if (activeTab === 'dashboard') {
+                    const ctx = document.getElementById('purchaseChart');
+                    if (!ctx) return;
+                    const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
+                    const datasets = categories.map((cat, index) => {
+                        const monthlyData = new Array(12).fill(0);
+                        transaksiMasuk
+                            .filter(t => t.kategori === cat && new Date(t.tanggal).getFullYear() === currentYear)
+                            .forEach(t => {
+                                const month = new Date(t.tanggal).getMonth();
+                                monthlyData[month] += (t.jumlah * (t.harga || 0));
+                            });
+                        return {
+                            label: cat,
+                            data: monthlyData,
+                            borderColor: colors[index % colors.length],
+                            backgroundColor: colors[index % colors.length] + '20',
+                            borderWidth: 3,
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 4
+                        };
+                    });
+                    if (chartRef.current) chartRef.current.destroy();
+                    chartRef.current = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels, datasets },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: { y: { beginAtZero: true, ticks: { callback: (v) => 'Rp ' + v.toLocaleString('id-ID') } } }
+                        }
+                    });
+                }
+            }, [activeTab, transaksiMasuk, categories]);
+
+            // Price Trend Chart
+            useEffect(() => {
+                if (activeTab === 'tren-harga' && dataTrenHarga.length > 0) {
+                    const ctx = document.getElementById('priceTrendChart');
+                    if (!ctx) return;
+                    
+                    if (priceChartRef.current) priceChartRef.current.destroy();
+                    
+                    priceChartRef.current = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: dataTrenHarga.map(d => new Date(d.tanggal).toLocaleDateString('id-ID')),
+                            datasets: [{
+                                label: 'Harga Beli Satuan (Rp)',
+                                data: dataTrenHarga.map(d => d.harga),
+                                borderColor: '#2563eb',
+                                backgroundColor: '#2563eb20',
+                                borderWidth: 4,
+                                tension: 0.2,
+                                fill: true,
+                                pointRadius: 6,
+                                pointHoverRadius: 8
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: false,
+                                    ticks: { callback: (v) => 'Rp ' + v.toLocaleString('id-ID') }
+                                }
+                            }
+                        }
+                    });
+                }
+            }, [activeTab, dataTrenHarga]);
+
+            // Handlers
+            const handleAddRowMasuk = () => setMultiInputMasuk([...multiInputMasuk, { idBarang: '', jumlah: '', harga: '', kategori: '' }]);
+            const handleRemoveRowMasuk = (index) => setMultiInputMasuk(multiInputMasuk.filter((_, i) => i !== index));
+            
+            const handleAddRowKeluar = () => setMultiInputKeluar([...multiInputKeluar, { idBarang: '', jumlah: '', kategori: '' }]);
+            const handleRemoveRowKeluar = (index) => setMultiInputKeluar(multiInputKeluar.filter((_, i) => i !== index));
+
+            const saveMultiMasuk = (e) => {
+                e.preventDefault();
+                const newEntries = [];
+                for (let item of multiInputMasuk) {
+                    if (!item.idBarang || !item.jumlah || !item.harga) continue;
+                    const b = masterBarang.find(x => x.id === parseInt(item.idBarang));
+                    newEntries.push({
+                        id: Date.now() + Math.random(),
+                        tanggal: globalTanggal,
+                        vendor: globalVendor,
+                        idBarang: b.id,
+                        namaBarang: b.nama,
+                        kategori: b.kategori,
+                        jumlah: Number(item.jumlah),
+                        harga: Number(item.harga),
+                        satuan: 'Pcs'
+                    });
+                }
+                if (newEntries.length === 0) return alert("Mohon isi minimal satu barang dengan lengkap.");
+                setTransaksiMasuk([...transaksiMasuk, ...newEntries]);
+                setMultiInputMasuk([{ idBarang: '', jumlah: '', harga: '', kategori: '' }]);
+                setGlobalVendor('');
+                alert("Berhasil menyimpan " + newEntries.length + " item.");
+            };
+
+            const saveMultiKeluar = (e) => {
+                e.preventDefault();
+                const newEntries = [];
+                for (let item of multiInputKeluar) {
+                    if (!item.idBarang || !item.jumlah) continue;
+                    const b = masterBarang.find(x => x.id === parseInt(item.idBarang));
+                    newEntries.push({
+                        id: Date.now() + Math.random(),
+                        tanggal: globalTanggal,
+                        tujuan: globalTujuan,
+                        idBarang: b.id,
+                        namaBarang: b.nama,
+                        kategori: b.kategori,
+                        jumlah: Number(item.jumlah),
+                        satuan: 'Pcs'
+                    });
+                }
+                if (newEntries.length === 0) return alert("Mohon isi minimal satu barang dengan lengkap.");
+                setTransaksiKeluar([...transaksiKeluar, ...newEntries]);
+                setMultiInputKeluar([{ idBarang: '', jumlah: '', kategori: '' }]);
+                setGlobalTujuan('');
+                alert("Berhasil menyimpan " + newEntries.length + " item.");
+            };
+
+            const getStokInfo = () => {
+                return masterBarang.map(brg => {
+                    const tM = transaksiMasuk.filter(t => t.idBarang === brg.id).reduce((s, t) => s + t.jumlah, 0);
+                    const tK = transaksiKeluar.filter(t => t.idBarang === brg.id).reduce((s, t) => s + t.jumlah, 0);
+                    return { ...brg, totalMasuk: tM, totalKeluar: tK, stokAkhir: tM - tK };
+                });
+            };
+
+            const handleUpdateItem = () => {
+                setMasterBarang(prev => prev.map(i => i.id === editingItem.id ? { ...i, nama: editNameValue } : i));
+                setEditingItem(null);
+            };
+
+            const handleUpdateCategory = () => {
+                if (!editCategoryValue || categories.includes(editCategoryValue)) {
+                    if (categories.includes(editCategoryValue) && editCategoryValue !== editingCategory) {
+                        alert("Nama kategori sudah ada.");
+                    }
+                    setEditingCategory(null);
+                    return;
                 }
                 
-                showPreview(finalId);
-                resetForm();
-            } catch (err) {
-                alert("Gagal sinkronisasi ke cloud.");
-            }
-        };
+                const oldCategoryName = editingCategory;
+                const newCategoryName = editCategoryValue;
 
-        window.resetForm = () => {
-            document.getElementById('formPengambilan').reset();
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('tanggalInput').value = today;
-            document.getElementById('editEntryId').value = "";
-            document.getElementById('itemRows').innerHTML = '';
-            document.getElementById('formTitle').innerText = "Form Pengambilan";
-            document.getElementById('submitBtn').innerText = "Simpan & Cetak Bukti";
-            document.getElementById('btnCancelEdit').classList.add('hidden');
-            addRow();
-        };
+                setCategories(prev => prev.map(c => c === oldCategoryName ? newCategoryName : c));
+                setMasterBarang(prev => prev.map(b => b.kategori === oldCategoryName ? { ...b, kategori: newCategoryName } : b));
+                setTransaksiMasuk(prev => prev.map(t => t.kategori === oldCategoryName ? { ...t, kategori: newCategoryName } : t));
+                setTransaksiKeluar(prev => prev.map(t => t.kategori === oldCategoryName ? { ...t, kategori: newCategoryName } : t));
+                
+                setEditingCategory(null);
+                setEditCategoryValue('');
+            };
 
-        window.editEntry = (id) => {
-            const entry = transactions.find(d => d.id === id);
-            if (!entry) return;
-            document.getElementById('editEntryId').value = entry.id;
-            document.getElementById('tanggalInput').value = entry.isoDate || new Date().toISOString().split('T')[0];
-            document.getElementById('namaPengambil').value = entry.namaPengambil;
-            document.getElementById('unitKerjaManual').value = entry.unitKerja;
-            document.getElementById('itemRows').innerHTML = '';
-            entry.items.forEach(it => addRow(it.nama, it.qty, it.satuan));
-            document.getElementById('formTitle').innerText = "Update Transaksi Cloud";
-            document.getElementById('submitBtn').innerText = "Simpan Perubahan Cloud";
-            document.getElementById('btnCancelEdit').classList.remove('hidden');
-            switchTab('input');
-        };
+            const handleDeleteTransaksi = (id, tipe) => {
+                if (tipe === 'MASUK') {
+                    setTransaksiMasuk(transaksiMasuk.filter(t => t.id !== id));
+                } else {
+                    setTransaksiKeluar(transaksiKeluar.filter(t => t.id !== id));
+                }
+            };
 
-        const renderDatabase = () => {
-            const body = document.getElementById('databaseBody');
-            body.innerHTML = transactions.map(row => `
-                <tr class="hover:bg-slate-50 transition-colors border-b border-slate-50">
-                    <td class="px-6 py-4">
-                        <div class="font-bold text-indigo-600">${row.regCode || 'NEW'}</div>
-                        <div class="text-[10px] text-slate-400 font-bold uppercase">${row.tanggal}</div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="font-bold uppercase text-slate-700 leading-tight">${row.namaPengambil}</div>
-                        <div class="text-[9px] text-slate-400 font-bold uppercase tracking-tight">${row.unitKerja}</div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="flex flex-wrap gap-1 max-w-xs">
-                            ${row.items.map(it => `
-                                <span class="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100 font-bold uppercase">
-                                    ${it.nama} (${it.qty})
-                                </span>
-                            `).join('')}
+            const handleUpdateTransaksi = (e) => {
+                e.preventDefault();
+                if (editingTransaksi.tipe === 'MASUK') {
+                    setTransaksiMasuk(transaksiMasuk.map(t => t.id === editingTransaksi.id ? editingTransaksi : t));
+                } else {
+                    setTransaksiKeluar(transaksiKeluar.map(t => t.id === editingTransaksi.id ? editingTransaksi : t));
+                }
+                setEditingTransaksi(null);
+            };
+
+            // Import Handler
+            const handleImportExcel = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                    
+                    const newItems = [];
+                    jsonData.forEach((row) => {
+                        const namaBarang = row[0]?.toString().trim();
+                        if (namaBarang && namaBarang !== "" && !masterBarang.some(b => b.nama.toLowerCase() === namaBarang.toLowerCase())) {
+                            newItems.push({
+                                id: Date.now() + Math.random(),
+                                nama: namaBarang,
+                                kategori: importCategory
+                            });
+                        }
+                    });
+
+                    if (newItems.length > 0) {
+                        setMasterBarang([...masterBarang, ...newItems]);
+                        alert(`Berhasil mengimpor ${newItems.length} barang ke kategori ${importCategory}`);
+                    } else {
+                        alert("Tidak ada barang baru yang ditemukan atau format tidak sesuai.");
+                    }
+                    e.target.value = null; // Reset input
+                };
+                reader.readAsArrayBuffer(file);
+            };
+
+            const SidebarItem = ({ id, icon, label }) => (
+                <button onClick={() => setActiveTab(id)} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === id ? 'active-nav shadow-lg' : 'text-gray-500 hover:bg-gray-100'}`}>
+                    <i data-lucide={icon} className="w-5 h-5"></i>
+                    <span className="font-medium text-sm">{label}</span>
+                </button>
+            );
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    <aside className="w-72 bg-white border-r flex flex-col p-6 overflow-y-auto no-print">
+                        <div className="mb-10">
+                            <h1 className="text-2xl font-black text-blue-600 italic tracking-tighter">GUDANG<span className="text-gray-800">SMART</span></h1>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mt-1">Sistem Inventaris</p>
                         </div>
-                    </td>
-                    <td class="px-6 py-4 text-center">
-                        <div class="flex items-center justify-center gap-4">
-                            <button onclick="showPreview('${row.id}')" class="text-indigo-600 hover:text-indigo-800 font-bold text-xs">CETAK</button>
-                            <button onclick="editEntry('${row.id}')" class="text-amber-500 hover:text-amber-700 font-bold text-xs">EDIT</button>
-                            <button onclick="deleteEntry('${row.id}')" class="text-red-500 hover:text-red-700 font-bold text-xs">HAPUS</button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-        };
+                        <nav className="flex-1 space-y-1">
+                            <SidebarItem id="dashboard" icon="layout-dashboard" label="Dashboard" />
+                            <SidebarItem id="input-manual" icon="settings" label="Pengaturan Master" />
+                            <SidebarItem id="master" icon="package" label="Daftar Barang" />
+                            <SidebarItem id="pembelian" icon="plus-circle" label="Barang Masuk" />
+                            <SidebarItem id="pengeluaran" icon="minus-circle" label="Barang Keluar" />
+                            <SidebarItem id="database-transaksi" icon="database" label="Database Transaksi" />
+                            <SidebarItem id="riwayat-barang" icon="history" label="Riwayat per Barang" />
+                            <SidebarItem id="riwayat-ruangan" icon="map-pin" label="Riwayat per Ruangan" />
+                            <SidebarItem id="laporan" icon="file-text" label="Laporan Stok" />
+                            <SidebarItem id="tren-harga" icon="trending-up" label="Tren Harga Barang" />
+                        </nav>
+                    </aside>
 
-        window.deleteEntry = async (id) => {
-            if (!currentUser) return;
-            if (confirm('Hapus riwayat ini selamanya dari Cloud?')) {
-                try {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id));
-                } catch (e) { alert("Gagal menghapus data."); }
-            }
-        };
+                    <main className="flex-1 overflow-y-auto p-6 md:p-10 bg-slate-50">
+                        <header className="mb-8 no-print">
+                            <h2 className="text-3xl font-bold text-gray-800 capitalize">{activeTab.replace('-', ' ')}</h2>
+                        </header>
 
-        window.renderReport = () => {
-            const periodInput = document.getElementById('reportPeriod');
-            if(!periodInput.value) return;
-            const [year, month] = periodInput.value.split('-');
-            
-            const filteredData = transactions.filter(d => {
-                const dDate = new Date(d.isoDate);
-                return dDate.getFullYear() == year && (dDate.getMonth() + 1) == month;
-            });
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 no-print">
+                                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                                        <p className="text-xs font-bold text-gray-400 uppercase">Master Barang</p>
+                                        <h4 className="text-3xl font-bold text-blue-600">{masterBarang.length}</h4>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                                        <p className="text-xs font-bold text-gray-400 uppercase">Kategori</p>
+                                        <h4 className="text-3xl font-bold text-purple-600">{categories.length}</h4>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                                        <p className="text-xs font-bold text-gray-400 uppercase">Total Masuk (Rp)</p>
+                                        <h4 className="text-2xl font-bold text-emerald-600">{transaksiMasuk.reduce((a, b) => a + (b.jumlah * b.harga), 0).toLocaleString('id-ID')}</h4>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                                        <p className="text-xs font-bold text-gray-400 uppercase">Total Keluar (Unit)</p>
+                                        <h4 className="text-3xl font-bold text-orange-600">{transaksiKeluar.reduce((a, b) => a + b.jumlah, 0)}</h4>
+                                    </div>
+                                </div>
 
-            const body = document.getElementById('reportTableBody');
-            let html = "";
-            filteredData.forEach(entry => {
-                entry.items.forEach(it => {
-                    html += `
-                        <tr class="hover:bg-slate-50 border-b border-slate-100">
-                            <td class="px-6 py-3 text-[10px] font-bold text-slate-400">${entry.tanggal}</td>
-                            <td class="px-6 py-3">
-                                <div class="font-bold uppercase text-slate-700">${entry.namaPengambil}</div>
-                                <div class="text-[9px] font-bold text-slate-400 uppercase">${entry.unitKerja}</div>
-                            </td>
-                            <td class="px-6 py-3 font-semibold uppercase text-indigo-600 text-xs">${it.nama}</td>
-                            <td class="px-6 py-3 text-center font-black">${it.qty} <small class="font-normal text-slate-400">${it.satuan}</small></td>
-                        </tr>
-                    `;
-                });
-            });
-            body.innerHTML = html || '<tr><td colspan="4" class="p-12 text-center text-slate-300 italic">Data tidak ditemukan untuk periode ini.</td></tr>';
-        };
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-gray-100 no-print">
+                                        <div className="flex justify-between items-center mb-6">
+                                            <h3 className="font-bold text-gray-800">Tren Pembelian Tahunan</h3>
+                                            <div className="text-[10px] font-black text-gray-400 bg-gray-50 px-3 py-1 rounded-full uppercase">Visualisasi Aliran Dana</div>
+                                        </div>
+                                        <div className="chart-container">
+                                            <canvas id="purchaseChart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                                        <h3 className="font-bold text-gray-800 mb-6">Analisis Anggaran</h3>
+                                        <div className="space-y-4">
+                                            {budgetAnalysis.map((item, idx) => (
+                                                <div key={idx} className="group">
+                                                    <div className="flex justify-between items-center mb-1.5">
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{item.kategori}</span>
+                                                        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">{item.persen}%</span>
+                                                    </div>
+                                                    <div className="w-full bg-slate-100 h-2 rounded-full mb-1 overflow-hidden">
+                                                        <div 
+                                                            className="h-full bg-blue-500 rounded-full transition-all duration-1000 ease-out" 
+                                                            style={{ width: `${item.persen}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <div className="flex justify-between items-baseline">
+                                                        <span className="text-xs text-slate-400">{item.totalUnit} Unit</span>
+                                                        <span className="text-sm font-bold text-slate-700">Rp {item.totalHarga.toLocaleString('id-ID')}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {budgetAnalysis.length === 0 && (
+                                                <div className="py-10 text-center text-slate-300 italic text-sm">Belum ada data transaksi masuk.</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-        window.showPreview = (id) => {
-            const entry = transactions.find(d => d.id === id);
-            if(!entry) return;
+                        {activeTab === 'pembelian' && (
+                            <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                                <form onSubmit={saveMultiMasuk}>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Tanggal Transaksi</label>
+                                            <input type="date" value={globalTanggal} onChange={e => setGlobalTanggal(e.target.value)} className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Nama Vendor</label>
+                                            <input type="text" value={globalVendor} onChange={e => setGlobalVendor(e.target.value)} placeholder="Supplier / Toko" className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                    </div>
 
-            const content = `
-                <div style="font-family: 'Plus Jakarta Sans', sans-serif; color: #000; width: 100%; box-sizing: border-box; background: white;">
-                    <div style="text-align: center; border-bottom: 2px solid #000; padding: 2px 0 6px 0;">
-                        <h2 style="margin: 0; font-size: 11pt; font-weight: 800; letter-spacing: -0.01em;">RSU DADI KELUARGA</h2>
-                        <p style="margin: 0; font-size: 7pt; font-weight: 700; color: #333; letter-spacing: 1px;">BUKTI PENGAMBILAN LOGISTIK</p>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 7.5pt; padding: 8px 0; border-bottom: 1px dashed #000; margin-bottom: 10px;">
-                        <div style="width: 65%;">
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <tr><td style="width: 25%; color: #666;">Unit Kerja</td><td>: <b>${entry.unitKerja.toUpperCase()}</b></td></tr>
-                                <tr><td style="color: #666;">Penerima</td><td>: <b>${entry.namaPengambil.toUpperCase()}</b></td></tr>
-                            </table>
-                        </div>
-                        <div style="text-align: right; width: 35%;">
-                            <span style="display: block; font-family: 'JetBrains Mono'; font-weight: 800; font-size: 8pt;">${entry.regCode}</span>
-                            <span style="display: block; font-size: 6.5pt; margin-top: 2px;">Tgl: ${entry.tanggal}</span>
-                        </div>
-                    </div>
-                    <div style="min-height: 8.5cm;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 7.5pt;">
-                            <thead>
-                                <tr style="border-bottom: 1.5px solid #000;">
-                                    <th style="padding: 5px 2px; text-align: left; width: 60%; text-transform: uppercase; font-size: 6.5pt;">Item Barang</th>
-                                    <th style="padding: 5px 2px; text-align: center; width: 15%; text-transform: uppercase; font-size: 6.5pt;">Qty</th>
-                                    <th style="padding: 5px 2px; text-align: center; width: 25%; text-transform: uppercase; font-size: 6.5pt;">Satuan</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${entry.items.map(it => `
-                                <tr style="border-bottom: 0.5px solid #eee;">
-                                    <td style="padding: 6px 2px; font-weight: 500; text-transform: uppercase;">${it.nama}</td>
-                                    <td style="padding: 6px 2px; text-align: center; font-weight: 800;">${it.qty}</td>
-                                    <td style="padding: 6px 2px; text-align: center; text-transform: uppercase; color: #444;">${it.satuan || '-'}</td>
-                                </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div style="margin-top: 40px; display: flex; justify-content: space-between; font-size: 7.5pt; text-align: center;">
-                        <div style="width: 120px;">
-                            <p style="margin-bottom: 50px; font-size: 6.5pt; color: #444;">Petugas Logistik,</p>
-                            <p style="border-top: 1px solid #000; padding-top: 4px;">( .................... )</p>
-                        </div>
-                        <div style="width: 120px;">
-                            <p style="margin-bottom: 50px; font-size: 6.5pt; color: #444;">Penerima,</p>
-                            <p style="font-weight: 800; border-top: 1px solid #000; padding-top: 4px;">${entry.namaPengambil.toUpperCase()}</p>
-                        </div>
-                    </div>
-                    <div style="text-align: center; font-size: 5.5pt; margin-top: 30px; border-top: 1px solid #f1f1f1; padding-top: 10px; color: #bbb;">
-                        Dicetak secara cloud otomatis oleh Gudang RSU Dadi Keluarga
-                    </div>
+                                    <table className="w-full mb-6">
+                                        <thead>
+                                            <tr className="text-[10px] uppercase text-gray-400 font-black border-b">
+                                                <th className="p-3 text-left">Kategori</th>
+                                                <th className="p-3 text-left">Nama Barang</th>
+                                                <th className="p-3 text-left w-32">Jumlah</th>
+                                                <th className="p-3 text-left w-48">Harga Satuan</th>
+                                                <th className="p-3 text-center w-16">Hapus</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {multiInputMasuk.map((row, index) => (
+                                                <tr key={index} className="border-b last:border-0">
+                                                    <td className="p-2">
+                                                        <select value={row.kategori} onChange={e => {
+                                                            const updated = [...multiInputMasuk];
+                                                            updated[index].kategori = e.target.value;
+                                                            updated[index].idBarang = '';
+                                                            setMultiInputMasuk(updated);
+                                                        }} className="w-full border p-2 rounded-lg text-sm">
+                                                            <option value="">Pilih Kategori</option>
+                                                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                                        </select>
+                                                    </td>
+                                                    <td className="p-2">
+                                                        <select disabled={!row.kategori} value={row.idBarang} onChange={e => {
+                                                            const updated = [...multiInputMasuk];
+                                                            updated[index].idBarang = e.target.value;
+                                                            setMultiInputMasuk(updated);
+                                                        }} className="w-full border p-2 rounded-lg text-sm">
+                                                            <option value="">Pilih Barang</option>
+                                                            {masterBarang.filter(b => b.kategori === row.kategori).map(b => <option key={b.id} value={b.id}>{b.nama}</option>)}
+                                                        </select>
+                                                    </td>
+                                                    <td className="p-2"><input type="number" value={row.jumlah} onChange={e => {const u = [...multiInputMasuk]; u[index].jumlah = e.target.value; setMultiInputMasuk(u)}} placeholder="0" className="w-full border p-2 rounded-lg text-sm text-center" /></td>
+                                                    <td className="p-2"><input type="number" value={row.harga} onChange={e => {const u = [...multiInputMasuk]; u[index].harga = e.target.value; setMultiInputMasuk(u)}} placeholder="Rp" className="w-full border p-2 rounded-lg text-sm" /></td>
+                                                    <td className="p-2 text-center">
+                                                        {multiInputMasuk.length > 1 && <button type="button" onClick={() => handleRemoveRowMasuk(index)} className="text-rose-500 hover:bg-rose-50 p-2 rounded-lg"><i data-lucide="trash-2" className="w-4 h-4"></i></button>}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    
+                                    <div className="flex justify-between items-center">
+                                        <button type="button" onClick={handleAddRowMasuk} className="text-blue-600 font-bold text-sm flex items-center hover:underline"><i data-lucide="plus" className="w-4 h-4 mr-1"></i> Tambah Baris Barang</button>
+                                        <button type="submit" className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-bold shadow-lg hover:bg-blue-700">Simpan Semua Barang Masuk</button>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
+
+                        {activeTab === 'pengeluaran' && (
+                            <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                                <form onSubmit={saveMultiKeluar}>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Tanggal Distribusi</label>
+                                            <input type="date" value={globalTanggal} onChange={e => setGlobalTanggal(e.target.value)} className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Tujuan / Ruangan</label>
+                                            <input type="text" value={globalTujuan} onChange={e => setGlobalTujuan(e.target.value)} placeholder="Contoh: Poli Umum" className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none" />
+                                        </div>
+                                    </div>
+
+                                    <table className="w-full mb-6">
+                                        <thead>
+                                            <tr className="text-[10px] uppercase text-gray-400 font-black border-b">
+                                                <th className="p-3 text-left">Kategori</th>
+                                                <th className="p-3 text-left">Nama Barang (Sisa Stok)</th>
+                                                <th className="p-3 text-left w-32">Jumlah Keluar</th>
+                                                <th className="p-3 text-center w-16">Hapus</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {multiInputKeluar.map((row, index) => (
+                                                <tr key={index} className="border-b last:border-0">
+                                                    <td className="p-2">
+                                                        <select value={row.kategori} onChange={e => {
+                                                            const updated = [...multiInputKeluar];
+                                                            updated[index].kategori = e.target.value;
+                                                            updated[index].idBarang = '';
+                                                            setMultiInputKeluar(updated);
+                                                        }} className="w-full border p-2 rounded-lg text-sm">
+                                                            <option value="">Pilih Kategori</option>
+                                                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                                        </select>
+                                                    </td>
+                                                    <td className="p-2">
+                                                        <select disabled={!row.kategori} value={row.idBarang} onChange={e => {
+                                                            const updated = [...multiInputKeluar];
+                                                            updated[index].idBarang = e.target.value;
+                                                            setMultiInputKeluar(updated);
+                                                        }} className="w-full border p-2 rounded-lg text-sm">
+                                                            <option value="">Pilih Barang</option>
+                                                            {getStokInfo().filter(b => b.kategori === row.kategori).map(b => <option key={b.id} value={b.id}>{b.nama} (Stok: {b.stokAkhir})</option>)}
+                                                        </select>
+                                                    </td>
+                                                    <td className="p-2"><input type="number" value={row.jumlah} onChange={e => {const u = [...multiInputKeluar]; u[index].jumlah = e.target.value; setMultiInputKeluar(u)}} placeholder="0" className="w-full border p-2 rounded-lg text-sm text-center" /></td>
+                                                    <td className="p-2 text-center">
+                                                        {multiInputKeluar.length > 1 && <button type="button" onClick={() => handleRemoveRowKeluar(index)} className="text-rose-500 hover:bg-rose-50 p-2 rounded-lg"><i data-lucide="trash-2" className="w-4 h-4"></i></button>}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    
+                                    <div className="flex justify-between items-center">
+                                        <button type="button" onClick={handleAddRowKeluar} className="text-orange-600 font-bold text-sm flex items-center hover:underline"><i data-lucide="plus" className="w-4 h-4 mr-1"></i> Tambah Baris Barang</button>
+                                        <button type="submit" className="bg-orange-500 text-white px-10 py-4 rounded-2xl font-bold shadow-lg hover:bg-orange-600">Simpan Semua Barang Keluar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
+
+                        {activeTab === 'database-transaksi' && (
+                            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                                <div className="p-6 border-b flex justify-between items-center bg-white sticky top-0 z-10">
+                                    <h3 className="font-bold text-xl text-gray-800">Database Keluar-Masuk Barang</h3>
+                                </div>
+                                <div className="table-container">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest sticky top-0 z-10">
+                                                <th className="p-4">Tanggal</th>
+                                                <th className="p-4">Tipe</th>
+                                                <th className="p-4">Nama Barang</th>
+                                                <th className="p-4 text-center">Jumlah</th>
+                                                <th className="p-4">Vendor/Tujuan</th>
+                                                <th className="p-4 text-center">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {allTransactions.map((t) => (
+                                                <tr key={t.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
+                                                    <td className="p-4 text-xs font-medium text-gray-600">{new Date(t.tanggal).toLocaleDateString('id-ID')}</td>
+                                                    <td className="p-4">
+                                                        <span className={`text-[10px] px-2 py-1 rounded-full font-black ${t.tipe === 'MASUK' ? 'bg-emerald-100 text-emerald-600' : 'bg-orange-100 text-orange-600'}`}>{t.tipe}</span>
+                                                    </td>
+                                                    <td className="p-4 font-bold text-gray-800">{t.namaBarang}</td>
+                                                    <td className="p-4 text-center font-black">{t.jumlah}</td>
+                                                    <td className="p-4 text-xs text-gray-500">{t.vendor || t.tujuan}</td>
+                                                    <td className="p-4 text-center whitespace-nowrap">
+                                                        <button onClick={() => setEditingTransaksi(t)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-colors mr-1">
+                                                            <i data-lucide="edit-2" className="w-4 h-4"></i>
+                                                        </button>
+                                                        <button onClick={() => { if(confirm('Hapus transaksi ini?')) handleDeleteTransaksi(t.id, t.tipe); }} className="text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition-colors">
+                                                            <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {allTransactions.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="6" className="p-20 text-center text-gray-400 italic">Belum ada data transaksi.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'riwayat-barang' && (
+                            <div className="space-y-6">
+                                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 no-print">
+                                    <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+                                        <div className="flex-1 w-full">
+                                            <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Pilih Barang untuk Lihat Riwayat</label>
+                                            <select value={selectedBarangId} onChange={e => setSelectedBarangId(e.target.value)} className="w-full border-2 border-gray-100 rounded-2xl p-4 outline-none focus:border-blue-500 font-semibold text-gray-700 bg-slate-50">
+                                                <option value="">-- Cari Nama Barang --</option>
+                                                {masterBarang.map(b => <option key={b.id} value={b.id}>{b.nama} ({b.kategori})</option>)}
+                                            </select>
+                                        </div>
+                                        {infoBarangTerpilih && (
+                                            <div className="flex gap-2 w-full md:w-auto">
+                                                <button onClick={printReport} className="flex-1 md:flex-none bg-indigo-600 text-white px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-md">
+                                                    <i data-lucide="printer" className="w-5 h-5"></i> Cetak
+                                                </button>
+                                                <button onClick={() => exportToExcel(detailRiwayatBarang, `Riwayat_${infoBarangTerpilih.nama}`)} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md">
+                                                    <i data-lucide="file-spreadsheet" className="w-5 h-5"></i> Excel
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                {infoBarangTerpilih && (
+                                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                                        <div className="p-6 border-b flex justify-between items-center">
+                                            <div>
+                                                <h3 className="font-bold text-xl">Kartu Stok: {infoBarangTerpilih.nama}</h3>
+                                                <p className="text-sm text-gray-400">Kategori: {infoBarangTerpilih.kategori}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-[10px] text-gray-400 uppercase block">Stok Saat Ini</span>
+                                                <span className="text-2xl font-black text-blue-600">{infoBarangTerpilih.stok}</span>
+                                            </div>
+                                        </div>
+                                        <div className="table-container">
+                                            <table className="w-full text-left">
+                                                <thead>
+                                                    <tr className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest">
+                                                        <th className="p-4">Tanggal</th>
+                                                        <th className="p-4">Jenis</th>
+                                                        <th className="p-4">Jumlah</th>
+                                                        <th className="p-4">Vendor / Tujuan</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {detailRiwayatBarang.map((r, i) => (
+                                                        <tr key={i} className="border-b last:border-0 hover:bg-slate-50">
+                                                            <td className="p-4 text-xs font-medium">{new Date(r.tanggal).toLocaleDateString('id-ID')}</td>
+                                                            <td className="p-4">
+                                                                <span className={`text-[10px] px-2 py-1 rounded font-black ${r.jenis === 'MASUK' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>{r.jenis}</span>
+                                                            </td>
+                                                            <td className={`p-4 font-bold ${r.jenis === 'MASUK' ? 'text-emerald-600' : 'text-rose-600'}`}>{r.jenis === 'MASUK' ? '+' : '-'}{r.jumlah}</td>
+                                                            <td className="p-4 text-sm text-gray-500">{r.vendor || r.tujuan}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'riwayat-ruangan' && (
+                            <div className="space-y-6">
+                                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 no-print">
+                                    <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+                                        <div className="flex-1 w-full">
+                                            <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Pilih Ruangan / Divisi</label>
+                                            <select value={selectedRuangan} onChange={e => setSelectedRuangan(e.target.value)} className="w-full border-2 border-gray-100 rounded-2xl p-4 outline-none focus:border-blue-500 font-semibold text-gray-700 bg-slate-50">
+                                                <option value="">-- Pilih Ruangan --</option>
+                                                {daftarRuangan.map((r, i) => <option key={i} value={r}>{r}</option>)}
+                                            </select>
+                                        </div>
+                                        {selectedRuangan && (
+                                            <div className="flex gap-2 w-full md:w-auto">
+                                                <button onClick={printReport} className="flex-1 md:flex-none bg-indigo-600 text-white px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-md">
+                                                    <i data-lucide="printer" className="w-5 h-5"></i> Cetak
+                                                </button>
+                                                <button onClick={() => exportToExcel(detailRiwayatRuangan, `Riwayat_Ruangan_${selectedRuangan}`)} className="flex-1 md:flex-none bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-md">
+                                                    <i data-lucide="file-spreadsheet" className="w-5 h-5"></i> Excel
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                {selectedRuangan && (
+                                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                                        <div className="p-6 border-b"><h3 className="font-bold text-xl">Pemakaian: {selectedRuangan}</h3></div>
+                                        <div className="table-container">
+                                            <table className="w-full text-left">
+                                                <thead>
+                                                    <tr className="bg-gray-50 text-gray-400 text-[10px] uppercase font-black">
+                                                        <th className="p-4">Tanggal</th>
+                                                        <th className="p-4">Nama Barang</th>
+                                                        <th className="p-4 text-center">Jumlah</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {detailRiwayatRuangan.map((item, idx) => (
+                                                        <tr key={idx} className="border-b hover:bg-slate-50">
+                                                            <td className="p-4 text-xs">{new Date(item.tanggal).toLocaleDateString('id-ID')}</td>
+                                                            <td className="p-4 font-bold">{item.namaBarang}</td>
+                                                            <td className="p-4 text-center text-orange-600 font-black">{item.jumlah}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'laporan' && (
+                            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                                <div className="p-6 border-b flex justify-between items-center">
+                                    <h3 className="font-bold text-xl">Laporan Stok Global</h3>
+                                    <div className="flex gap-2 no-print">
+                                        <button onClick={printReport} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 text-sm">
+                                            <i data-lucide="printer" className="w-4 h-4"></i> Cetak
+                                        </button>
+                                        <button onClick={() => exportToExcel(getStokInfo(), 'Laporan_Stok_Global')} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 text-sm">
+                                            <i data-lucide="file-spreadsheet" className="w-4 h-4"></i> Excel
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="table-container">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black">
+                                                <th className="p-4">Barang</th>
+                                                <th className="p-4">Kategori</th>
+                                                <th className="p-4 text-center">Masuk</th>
+                                                <th className="p-4 text-center">Keluar</th>
+                                                <th className="p-4 text-center">Stok</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {getStokInfo().map(item => (
+                                                <tr key={item.id} className="hover:bg-blue-50/30 border-b transition-colors">
+                                                    <td className="p-4 font-semibold">{item.nama}</td>
+                                                    <td className="p-4 text-xs">{item.kategori}</td>
+                                                    <td className="p-4 text-center text-emerald-600">+{item.totalMasuk}</td>
+                                                    <td className="p-4 text-center text-rose-500">-{item.totalKeluar}</td>
+                                                    <td className={`p-4 text-center font-black ${item.stokAkhir <= 5 ? 'text-rose-600 bg-rose-50' : 'text-blue-700'}`}>{item.stokAkhir}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'tren-harga' && (
+                            <div className="space-y-6">
+                                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Pilih Kategori</label>
+                                            <select value={priceTrendKategori} onChange={e => {setPriceTrendKategori(e.target.value); setPriceTrendBarangId('');}} className="w-full border-2 border-slate-100 rounded-xl p-3 outline-none focus:border-blue-500">
+                                                <option value="">-- Semua Kategori --</option>
+                                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Pilih Barang</label>
+                                            <select value={priceTrendBarangId} onChange={e => setPriceTrendBarangId(e.target.value)} className="w-full border-2 border-slate-100 rounded-xl p-3 outline-none focus:border-blue-500">
+                                                <option value="">-- Pilih Barang --</option>
+                                                {masterBarang
+                                                    .filter(b => !priceTrendKategori || b.kategori === priceTrendKategori)
+                                                    .map(b => <option key={b.id} value={b.id}>{b.nama}</option>)
+                                                }
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {priceTrendBarangId && (
+                                    <>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                                                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Harga Terakhir</p>
+                                                <h4 className="text-2xl font-bold text-blue-600">
+                                                    {statistikHarga ? `Rp ${statistikHarga.terakhir.toLocaleString('id-ID')}` : '-'}
+                                                </h4>
+                                            </div>
+                                            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                                                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Harga Tertinggi</p>
+                                                <h4 className="text-2xl font-bold text-rose-600">
+                                                    {statistikHarga ? `Rp ${statistikHarga.tertinggi.toLocaleString('id-ID')}` : '-'}
+                                                </h4>
+                                            </div>
+                                            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                                                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Harga Terendah</p>
+                                                <h4 className="text-2xl font-bold text-emerald-600">
+                                                    {statistikHarga ? `Rp ${statistikHarga.terendah.toLocaleString('id-ID')}` : '-'}
+                                                </h4>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                                            <h3 className="font-bold text-gray-800 mb-6 flex items-center">
+                                                <i data-lucide="line-chart" className="w-5 h-5 mr-2 text-blue-600"></i>
+                                                Grafik Fluktuasi Harga Beli
+                                            </h3>
+                                            <div className="chart-container" style={{height: '400px'}}>
+                                                {dataTrenHarga.length > 1 ? (
+                                                    <canvas id="priceTrendChart"></canvas>
+                                                ) : (
+                                                    <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2 italic">
+                                                        <i data-lucide="info" className="w-8 h-8 opacity-20"></i>
+                                                        <p>Dibutuhkan minimal 2 transaksi pembelian untuk menampilkan grafik tren.</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                                            <div className="p-6 border-b font-bold">Riwayat Perubahan Harga</div>
+                                            <div className="table-container">
+                                                <table className="w-full text-left">
+                                                    <thead>
+                                                        <tr className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black">
+                                                            <th className="p-4">Tanggal Pembelian</th>
+                                                            <th className="p-4">Harga Satuan</th>
+                                                            <th className="p-4">Kenaikan/Penurunan</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {dataTrenHarga.slice().reverse().map((d, idx, arr) => {
+                                                            const prev = arr[idx + 1];
+                                                            const diff = prev ? d.harga - prev.harga : 0;
+                                                            return (
+                                                                <tr key={idx} className="border-b hover:bg-slate-50">
+                                                                    <td className="p-4 text-sm font-medium">{new Date(d.tanggal).toLocaleDateString('id-ID')}</td>
+                                                                    <td className="p-4 font-bold">Rp {d.harga.toLocaleString('id-ID')}</td>
+                                                                    <td className="p-4 text-xs font-bold">
+                                                                        {diff > 0 && <span className="text-rose-500 flex items-center"><i data-lucide="arrow-up" className="w-3 h-3 mr-1"></i> Rp {diff.toLocaleString('id-ID')}</span>}
+                                                                        {diff < 0 && <span className="text-emerald-500 flex items-center"><i data-lucide="arrow-down" className="w-3 h-3 mr-1"></i> Rp {Math.abs(diff).toLocaleString('id-ID')}</span>}
+                                                                        {diff === 0 && <span className="text-gray-400">-</span>}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'master' && (
+                            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                                <div className="p-6 border-b font-bold text-xl">Master Data Barang</div>
+                                <div className="table-container">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="bg-gray-50 text-gray-400 text-[10px] uppercase font-black">
+                                                <th className="p-4">Nama Barang</th>
+                                                <th className="p-4">Kategori</th>
+                                                <th className="p-4 text-center">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {masterBarang.map(item => (
+                                                <tr key={item.id} className="hover:bg-slate-50 border-b">
+                                                    <td className="p-4 font-semibold">{item.nama}</td>
+                                                    <td className="p-4"><span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-xs font-bold">{item.kategori}</span></td>
+                                                    <td className="p-4 text-center whitespace-nowrap">
+                                                        <button onClick={() => { setEditingItem(item); setEditNameValue(item.nama); }} className="text-gray-400 hover:text-blue-600 p-2 transition-colors mr-2"><i data-lucide="edit-3" className="w-5 h-5"></i></button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'input-manual' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-8">
+                                    <div className="bg-white p-6 rounded-3xl border shadow-sm">
+                                        <h3 className="font-bold text-lg mb-4 flex items-center">
+                                            <i data-lucide="layers" className="w-5 h-5 mr-2 text-blue-600"></i>
+                                            Kelola Kategori
+                                        </h3>
+                                        <form onSubmit={(e) => {e.preventDefault(); if(newCategory && !categories.includes(newCategory)) {setCategories([...categories, newCategory]); setNewCategory('')}} } className="flex gap-2 mb-6">
+                                            <input type="text" value={newCategory} onChange={e => setNewCategory(e.target.value)} required className="flex-1 border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Kategori Baru" />
+                                            <button type="submit" className="bg-blue-600 text-white px-5 rounded-xl font-bold hover:bg-blue-700 transition-colors">Tambah</button>
+                                        </form>
+                                        
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase block mb-2 tracking-widest">Daftar Kategori</label>
+                                            <div className="grid grid-cols-1 gap-2">
+                                                {categories.map(c => (
+                                                    <div key={c} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100 group">
+                                                        <span className="font-medium text-gray-700">{c}</span>
+                                                        <button onClick={() => { setEditingCategory(c); setEditCategoryValue(c); }} className="text-gray-400 hover:text-blue-600 p-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                            <i data-lucide="edit-2" className="w-4 h-4"></i>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white p-6 rounded-3xl border border-dashed border-blue-200 shadow-sm bg-blue-50/20">
+                                        <h3 className="font-bold text-lg mb-4 flex items-center text-blue-800">
+                                            <i data-lucide="file-up" className="w-5 h-5 mr-2"></i>
+                                            Import Cepat via Excel
+                                        </h3>
+                                        <p className="text-xs text-blue-600 mb-4 bg-blue-50 p-3 rounded-xl">
+                                            Unggah file Excel (.xlsx). Pastikan nama barang ada di <b>Kolom A</b>. 
+                                            Sistem akan memasukkannya ke kategori yang dipilih di bawah.
+                                        </p>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-[10px] font-black text-gray-400 uppercase mb-2 block">Pilih Target Kategori</label>
+                                                <select value={importCategory} onChange={e => setImportCategory(e.target.value)} className="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="relative">
+                                                <input type="file" accept=".xlsx, .xls" onChange={handleImportExcel} ref={fileInputRef} className="hidden" id="excel-import" />
+                                                <label htmlFor="excel-import" className="flex flex-col items-center justify-center border-2 border-dashed border-blue-300 rounded-2xl p-6 hover:bg-blue-100 transition-all cursor-pointer">
+                                                    <i data-lucide="upload-cloud" className="w-8 h-8 text-blue-500 mb-2"></i>
+                                                    <span className="text-sm font-bold text-blue-600">Klik untuk Unggah Excel</span>
+                                                    <span className="text-[10px] text-gray-400 mt-1 italic">Satu Nama Barang per Baris</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-6 rounded-3xl border shadow-sm">
+                                    <h3 className="font-bold text-lg mb-4 flex items-center">
+                                        <i data-lucide="plus-square" className="w-5 h-5 mr-2 text-green-600"></i>
+                                        Tambah Master Satuan
+                                    </h3>
+                                    <form onSubmit={(e) => {e.preventDefault(); if(formMaster.nama) {setMasterBarang([...masterBarang, {id: Date.now(), ...formMaster}]); setFormMaster({nama:'', kategori:categories[0]})}} } className="space-y-4">
+                                        <div>
+                                            <label className="text-[10px] font-black text-gray-400 uppercase mb-2 block">Nama Barang</label>
+                                            <input type="text" value={formMaster.nama} onChange={e => setFormMaster({...formMaster, nama: e.target.value})} required className="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-green-500" placeholder="Contoh: Pulpen Kenko" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-black text-gray-400 uppercase mb-2 block">Kategori</label>
+                                            <select value={formMaster.kategori} onChange={e => setFormMaster({...formMaster, kategori: e.target.value})} className="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-green-500">
+                                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                        <button type="submit" className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold hover:bg-green-700 transition-all shadow-md mt-4">Simpan Ke Master Data</button>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Modals */}
+                        {editingItem && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay no-print">
+                                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-in fade-in zoom-in duration-200">
+                                    <h3 className="text-xl font-bold mb-6">Ubah Nama Barang</h3>
+                                    <input type="text" value={editNameValue} onChange={(e) => setEditNameValue(e.target.value)} className="w-full border-2 border-blue-100 rounded-2xl p-4 text-lg font-medium mb-6 outline-none focus:border-blue-500" />
+                                    <div className="flex gap-3">
+                                        <button onClick={() => setEditingItem(null)} className="flex-1 py-3 rounded-2xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors">Batal</button>
+                                        <button onClick={handleUpdateItem} className="flex-1 py-3 rounded-2xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-lg">Simpan</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {editingCategory && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay no-print">
+                                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-in fade-in zoom-in duration-200">
+                                    <h3 className="text-xl font-bold mb-2">Ubah Nama Kategori</h3>
+                                    <p className="text-xs text-rose-500 mb-6 font-medium">*Mengubah nama kategori akan memperbarui semua data barang dan riwayat terkait.</p>
+                                    <input type="text" value={editCategoryValue} onChange={(e) => setEditCategoryValue(e.target.value)} className="w-full border-2 border-purple-100 rounded-2xl p-4 text-lg font-medium mb-6 outline-none focus:border-purple-500" />
+                                    <div className="flex gap-3">
+                                        <button onClick={() => setEditingCategory(null)} className="flex-1 py-3 rounded-2xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors">Batal</button>
+                                        <button onClick={handleUpdateCategory} className="flex-1 py-3 rounded-2xl font-bold text-white bg-purple-600 hover:bg-purple-700 transition-colors shadow-lg">Simpan</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {editingTransaksi && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay no-print">
+                                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 animate-in fade-in zoom-in duration-200">
+                                    <h3 className="text-xl font-bold mb-6 flex items-center">
+                                        <i data-lucide="edit-2" className="w-5 h-5 mr-2 text-blue-600"></i>
+                                        Edit Transaksi {editingTransaksi.tipe}
+                                    </h3>
+                                    <form onSubmit={handleUpdateTransaksi} className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Tanggal</label>
+                                                <input type="date" value={editingTransaksi.tanggal} onChange={e => setEditingTransaksi({...editingTransaksi, tanggal: e.target.value})} className="w-full border p-3 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" required />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Jumlah</label>
+                                                <input type="number" value={editingTransaksi.jumlah} onChange={e => setEditingTransaksi({...editingTransaksi, jumlah: Number(e.target.value)})} className="w-full border p-3 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" required />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">{editingTransaksi.tipe === 'MASUK' ? 'Vendor / Supplier' : 'Tujuan / Ruangan'}</label>
+                                            <input type="text" value={editingTransaksi.tipe === 'MASUK' ? (editingTransaksi.vendor || '') : (editingTransaksi.tujuan || '')} 
+                                                onChange={e => {
+                                                    const key = editingTransaksi.tipe === 'MASUK' ? 'vendor' : 'tujuan';
+                                                    setEditingTransaksi({...editingTransaksi, [key]: e.target.value});
+                                                }} 
+                                                className="w-full border p-3 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" required />
+                                        </div>
+                                        {editingTransaksi.tipe === 'MASUK' && (
+                                            <div>
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Harga Satuan (Rp)</label>
+                                                <input type="number" value={editingTransaksi.harga || 0} onChange={e => setEditingTransaksi({...editingTransaksi, harga: Number(e.target.value)})} className="w-full border p-3 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                                            </div>
+                                        )}
+                                        <div className="flex gap-3 pt-4">
+                                            <button type="button" onClick={() => setEditingTransaksi(null)} className="flex-1 py-3 rounded-2xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors">Batal</button>
+                                            <button type="submit" className="flex-1 py-3 rounded-2xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-lg">Simpan Perubahan</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+                    </main>
                 </div>
-            `;
-            document.getElementById('previewSheet').innerHTML = content;
-            document.getElementById('printArea').innerHTML = content;
-            document.getElementById('modalPreview').classList.remove('hidden');
-        }
+            );
+        };
 
-        window.closePreview = () => document.getElementById('modalPreview').classList.add('hidden');
-
-        // Initial Start
-        initAuth();
-        resetForm();
-
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
