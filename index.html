@@ -54,16 +54,17 @@ import {
 } from 'lucide-react';
 
 // --- Konfigurasi Firebase ---
-const firebaseConfig = {
-  apiKey: "AIzaSyBiEWqdYX8zOjRwv4Mo1DRlFcSLsG8OhlQ",
-  authDomain: "gudangatk.firebaseapp.com",
-  databaseURL: "https://gudangatk-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "gudangatk",
-  storageBucket: "gudangatk.firebasestorage.app",
-  messagingSenderId: "274324790135",
-  appId: "1:274324790135:web:8b67b0c39524d2cf2cdf72",
-  measurementId: "G-KCYZG0ZZGR"
-};
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+  ? JSON.parse(__firebase_config) 
+  : {
+      apiKey: "AIzaSyBiEWqdYX8zOjRwv4Mo1DRlFcSLsG8OhlQ",
+      authDomain: "gudangatk.firebaseapp.com",
+      projectId: "gudangatk",
+      storageBucket: "gudangatk.firebasestorage.app",
+      messagingSenderId: "274324790135",
+      appId: "1:274324790135:web:8b67b0c39524d2cf2cdf72"
+    };
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -110,14 +111,28 @@ const App = () => {
 
   useEffect(() => {
     const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await signInAnonymously(auth);
+      try {
+        // Cek apakah token kustom tersedia dan valid
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          try {
+            await signInWithCustomToken(auth, __initial_auth_token);
+          } catch (tokenError) {
+            // Jika token mismatch atau expired, fallback ke anonymous
+            console.warn("Custom token failed, falling back to anonymous auth:", tokenError.message);
+            await signInAnonymously(auth);
+          }
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Authentication fatal error:", error);
       }
     };
+    
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -129,13 +144,29 @@ const App = () => {
     const qMaster = collection(db, 'artifacts', appId, 'public', 'data', 'master_barang');
     const qCategories = collection(db, 'artifacts', appId, 'public', 'data', 'categories');
 
-    const unsubPem = onSnapshot(qPembelian, (s) => setPembelian(s.docs.map(d => ({ id: d.id, ...d.data() }))), (e) => console.error(e));
-    const unsubPen = onSnapshot(qPengeluaran, (s) => setPengeluaran(s.docs.map(d => ({ id: d.id, ...d.data() }))), (e) => console.error(e));
-    const unsubMas = onSnapshot(qMaster, (s) => setMasterBarang(s.docs.map(d => ({ id: d.id, ...d.data() }))), (e) => console.error(e));
-    const unsubCat = onSnapshot(qCategories, (s) => {
-      setCategories(s.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    }, (e) => console.error(e));
+    // Gunakan try-catch atau error callback pada onSnapshot sesuai aturan
+    const unsubPem = onSnapshot(qPembelian, 
+      (s) => setPembelian(s.docs.map(d => ({ id: d.id, ...d.data() }))), 
+      (e) => console.error("Firestore Pembelian Error:", e)
+    );
+    const unsubPen = onSnapshot(qPengeluaran, 
+      (s) => setPengeluaran(s.docs.map(d => ({ id: d.id, ...d.data() }))), 
+      (e) => console.error("Firestore Pengeluaran Error:", e)
+    );
+    const unsubMas = onSnapshot(qMaster, 
+      (s) => setMasterBarang(s.docs.map(d => ({ id: d.id, ...d.data() }))), 
+      (e) => console.error("Firestore Master Error:", e)
+    );
+    const unsubCat = onSnapshot(qCategories, 
+      (s) => {
+        setCategories(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      }, 
+      (e) => {
+        console.error("Firestore Categories Error:", e);
+        setLoading(false);
+      }
+    );
 
     return () => { unsubPem(); unsubPen(); unsubMas(); unsubCat(); };
   }, [user]);
@@ -254,6 +285,7 @@ const App = () => {
 
   const handleAddCategory = async (e) => {
     e.preventDefault();
+    if (!user) return;
     const formData = new FormData(e.target);
     const nama = formData.get('catName').trim();
     if (!nama) return;
@@ -263,6 +295,7 @@ const App = () => {
   };
 
   const handleUpdateCategory = async (catId, oldName) => {
+    if (!user) return;
     const newName = editCategoryValue.trim();
     if (!newName || newName === oldName) {
       setEditingCategoryId(null);
@@ -288,6 +321,7 @@ const App = () => {
 
   const handleAddPembelian = async (e) => {
     e.preventDefault();
+    if (!user) return;
     const fd = new FormData(e.target);
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'pembelian'), {
       tanggal: fd.get('tanggal'),
@@ -306,6 +340,7 @@ const App = () => {
 
   const handleAddPengeluaran = async (e) => {
     e.preventDefault();
+    if (!user) return;
     const fd = new FormData(e.target);
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'pengeluaran'), {
       tanggal: fd.get('tanggal'),
@@ -323,6 +358,7 @@ const App = () => {
 
   const handleAddMasterBulk = async (e) => {
     e.preventDefault();
+    if (!user) return;
     setIsSubmitting(true);
     const fd = new FormData(e.target);
     const kategori = fd.get('kategori');
@@ -343,7 +379,7 @@ const App = () => {
     } finally { setIsSubmitting(false); }
   };
 
-  if (!user || loading) return (
+  if (loading) return (
     <div className="flex items-center justify-center h-screen bg-[#0f172a]">
       <div className="animate-pulse flex flex-col items-center gap-4 text-slate-400">
         <Box className="text-blue-500 animate-bounce" size={48} />
@@ -797,6 +833,7 @@ const App = () => {
 
                       <form onSubmit={bulkMode ? handleAddMasterBulk : async (e) => {
                         e.preventDefault();
+                        if (!user) return;
                         const fd = new FormData(e.target);
                         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'master_barang'), {
                           uid: generateUniqueID('BRG'),
